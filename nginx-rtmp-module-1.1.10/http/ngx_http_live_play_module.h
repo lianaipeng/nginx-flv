@@ -55,8 +55,7 @@ struct ngx_str_map_list_s {
     ngx_str_map_list_t* next; //next指针
 };
 
-struct ngx_http_flv_frame_s
-{
+struct ngx_http_flv_frame_s {
     u_char mtype;  //类型
     unsigned int mpts;//时间戳
     unsigned int mdelte;//间隔
@@ -92,13 +91,12 @@ typedef struct {
     ngx_http_flv_frame_t *frame_chain_tail; //内容数据，发送就从次链表拿数据发送
 
     ngx_http_flv_frame_t *frame_free;
-}ngx_http_live_play_request_ctx_t;
+} ngx_http_live_play_request_ctx_t;
 
-typedef struct
-{
+typedef struct {
 	char       *rs;
 	ngx_int_t   ret;
-}ngx_http_live_play_header_struct_t;
+} ngx_http_live_play_header_struct_t;
 
 static const ngx_http_live_play_header_struct_t  ngx_http_live_play_status[] =
 {
@@ -108,21 +106,23 @@ static const ngx_http_live_play_header_struct_t  ngx_http_live_play_status[] =
 	{"404 Not Found",NGX_HTTP_NOT_FOUND}
 };
 
-typedef enum
-{
+typedef enum {
 	HTTP_STATUS_200 = 0,
     HTTP_STATUS_302 = 1,
 	HTTP_STATUS_403 = 2,
 	HTTP_STATUS_404 = 3
-}ngx_http_respond_henader_status;
+} ngx_http_respond_henader_status;
 
-void ngx_str_format_string(ngx_str_t str,char* buf);
+void 
+ngx_str_format_string(ngx_str_t str, char *buf);
 
-ngx_int_t ngx_http_live_send_message(ngx_http_live_play_request_ctx_t *s, ngx_chain_t *out,
-u_char mtype,unsigned int mlen,unsigned int pts,unsigned int delta);
+ngx_int_t 
+ngx_http_live_send_message(ngx_http_live_play_request_ctx_t *s, ngx_chain_t *out, u_char mtype, unsigned int mlen, unsigned int pts, unsigned int delta);
 
-ngx_int_t  ngx_httpttp_live_play_send_http_header(void* ptr);
+ngx_int_t  
+ngx_http_live_play_send_http_header(void *ptr);
 
-void ngx_http_live_play_close(void * v);
+void 
+ngx_http_live_play_close(void * v);
 
 #endif

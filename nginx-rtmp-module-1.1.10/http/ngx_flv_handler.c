@@ -4,7 +4,7 @@
 //tagÊ±¼ä´ÁµÚËÄÎ»ÊÇÀ©Õ¹Î»
 //ffmpegÖÐÊÇ7f TagStamp[3] = v & 0x7f
 
-bool flv_big_endian_test()  
+int flv_big_endian_test()  
 {  
 	const short n = 1;  
 	if(*(char *)&n)  
@@ -16,30 +16,32 @@ bool flv_big_endian_test()
 
 void flv_put_num_to_buf(unsigned char szNum[],const char * psrc,int dstLenght)
 {
+    int n = 0;
 	if(flv_big_endian_test())
 	{
-		for (int n = 0; n < dstLenght; ++n)
+		for (; n < dstLenght; ++n)
 		{
 			szNum[n] = psrc[n];
 		}
 	}
 	else
 	{
-		for (int n = 0; n < dstLenght; ++n)
+        n = 0;
+		for (; n < dstLenght; ++n)
 		{
 			szNum[n] = psrc[dstLenght -1 - n];
 		}
 	}
 }
 
-bool ngx_flv_right_bigger(int left,int right)
+int ngx_flv_right_bigger(int left,int right)
 {
 	if(left < right)
 	{
 		printf("flv:dst size is smaller\n");
-		return true;
+		return 1;
 	}
-	return false;
+	return 0;
 }
 
 int ngx_flv_mem_cp(void *dst,const void * src,int size)
@@ -109,7 +111,8 @@ int ngx_flv_createm_databufNode(const char * szName,double data, ngx_flv_amf_arr
 	return nSize;
 }
 
-int ngx_flv_createm_bdatabufNode(const char * szName,bool data, ngx_flv_amf_bool_array_node_t *node)
+// int ngx_flv_createm_bdatabufNode(const char * szName,bool data, ngx_flv_amf_bool_array_node_t *node)
+int ngx_flv_createm_bdatabufNode(const char * szName,int data, ngx_flv_amf_bool_array_node_t *node)
 {
 	if(node == NULL ||  szName == NULL)
 		return 0;

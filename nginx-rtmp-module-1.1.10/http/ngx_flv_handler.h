@@ -193,11 +193,12 @@ struct ngx_flv_avc_config_header_s
 }
 
 
-bool flv_big_endian_test();
+// bool flv_big_endian_test();
+int flv_big_endian_test();
 
 void flv_put_num_to_buf(unsigned char szNum[],const char * psrc,int dstLenght);
 
-bool ngx_flv_right_bigger(int left,int right);
+int ngx_flv_right_bigger(int left,int right);
 
 int ngx_flv_mem_cp(void *dst,const void * src,int size);
 
@@ -207,7 +208,8 @@ int ngx_flv_creatm_databufNodeCommon(const char * szName,char nameLength[2],char
 
 int ngx_flv_createm_databufNode(const char * szName,double data,ngx_flv_amf_array_node_t * node);
 
-int ngx_flv_createm_bdatabufNode(const char * szName,bool data, ngx_flv_amf_bool_array_node_t * node);
+//int ngx_flv_createm_bdatabufNode(const char * szName, bool data, ngx_flv_amf_bool_array_node_t * node);
+int ngx_flv_createm_bdatabufNode(const char * szName, int data, ngx_flv_amf_bool_array_node_t * node);
 
 int ngx_flv_wrtitem_databufNode(unsigned char * buf,int nLength,const  ngx_flv_amf_array_node_t node);
 

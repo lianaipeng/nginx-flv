@@ -65,7 +65,8 @@ void ngx_http_flv_free_tag_mem(ngx_chain_t* in)
     }
 }
 
-ngx_int_t   ngx_perpare_flv_header(u_char* flv_header,bool has_video,bool has_audio,unsigned int* data_size)
+ngx_int_t   
+ngx_perpare_flv_header(u_char* flv_header, int has_video, int has_audio, unsigned int* data_size)
 {
     if(flv_header == NULL)
         return NGX_ERROR;
@@ -91,8 +92,9 @@ ngx_int_t   ngx_perpare_flv_header(u_char* flv_header,bool has_video,bool has_au
     return NGX_OK;
 }
 
-ngx_int_t ngx_prepare_flv_media_data(u_char* buf,unsigned int buf_len,bool need_duration_and_filesize,
-                                    bool has_video,bool has_audio,unsigned int* duration_pos,unsigned int * file_size_pos
+ngx_int_t 
+ngx_prepare_flv_media_data(u_char* buf,unsigned int buf_len,int need_duration_and_filesize,
+                         int has_video, int has_audio, unsigned int* duration_pos, unsigned int * file_size_pos
                                     ,ngx_flv_media_data_t meta,unsigned int* data_size)
 {
     if(buf == NULL)
@@ -255,8 +257,8 @@ int  ngx_prepare_flv_avc_header_data(unsigned char * pBuf,int nBufLength,ngx_flv
 	return nLenght;
 }
 
-ngx_chain_t* ngx_http_flv_perpare_video_header(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h
-                                        ,ngx_chain_t *out)
+ngx_chain_t* 
+ngx_http_flv_perpare_video_header(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, ngx_chain_t *out)
 {
     u_char *avc = NULL;
     u_char *sps = NULL;
@@ -329,7 +331,7 @@ ngx_chain_t* ngx_http_flv_perpare_video_header(ngx_rtmp_session_t *s, ngx_rtmp_h
 	int nBufLen = avc_buf_len - nIndex;
 
 	if(ngx_flv_right_bigger(nBufLen,sizeof(tag_size)))
-		return false;
+		return NULL;
 
 	nIndex += ngx_flv_mem_cp(avc+nIndex,&tag_size,sizeof(tag_size));
     //data size
@@ -351,8 +353,8 @@ int  ngx_audio_specific_config (unsigned char objectType,int samplerate, int cha
 	return 2;
 }
 
-ngx_chain_t* ngx_http_flv_perpare_audio_header(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h
-                                        ,ngx_chain_t *out)
+ngx_chain_t* 
+ngx_http_flv_perpare_audio_header(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, ngx_chain_t *out)
 {
     u_char* aac = NULL;
     unsigned int aac_len = 1024;
@@ -407,7 +409,7 @@ ngx_chain_t* ngx_http_flv_perpare_audio_header(ngx_rtmp_session_t *s, ngx_rtmp_h
 	int nBufLen = aac_len - nIndex;
 
 	if(ngx_flv_right_bigger(nBufLen,sizeof(tag_size)))
-		return false;
+		return NULL;
 
 	nIndex += ngx_flv_mem_cp(aac+nIndex,&tag_size,sizeof(tag_size));
     //data size
@@ -416,8 +418,9 @@ ngx_chain_t* ngx_http_flv_perpare_audio_header(ngx_rtmp_session_t *s, ngx_rtmp_h
     return out;
 }
 
-ngx_chain_t* ngx_http_flv_perpare_meta_header(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h
-                                        ,ngx_chain_t *out) //header =  flv header tag + mediadata tag
+//header =  flv header tag + mediadata tag
+ngx_chain_t* 
+ngx_http_flv_perpare_meta_header(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, ngx_chain_t *out) 
 {
     ngx_rtmp_codec_ctx_t  *codec_ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
     if(codec_ctx == NULL)
@@ -427,7 +430,7 @@ ngx_chain_t* ngx_http_flv_perpare_meta_header(ngx_rtmp_session_t *s, ngx_rtmp_he
     ngx_int_t flv_len  = 0;
 
     unsigned int buf_len = 1024;
-    bool need_duration_and_filesize = false;
+    int need_duration_and_filesize = 0;
     unsigned int duration_pos = 0;
     unsigned int file_size_pos = 0;
     ngx_flv_media_data_t meta;
@@ -435,8 +438,8 @@ ngx_chain_t* ngx_http_flv_perpare_meta_header(ngx_rtmp_session_t *s, ngx_rtmp_he
     unsigned int flv_header_size = 0;
     u_char buf[1024] = {0};
     // flv tag
-    bool  has_video = codec_ctx->aac_header == NULL ? false : true;
-    bool  has_audio = codec_ctx->avc_header == NULL ? false : true;
+    int has_video = codec_ctx->aac_header == NULL ? 0 : 1;
+    int has_audio = codec_ctx->avc_header == NULL ? 0 : 1;
     memset(&meta,0,sizeof(ngx_flv_media_data_t));
 
     if(ngx_perpare_flv_header(flv_header,has_video,has_audio,&flv_header_size) == NGX_ERROR)
@@ -452,7 +455,8 @@ ngx_chain_t* ngx_http_flv_perpare_meta_header(ngx_rtmp_session_t *s, ngx_rtmp_he
     return out;
 }
 
-ngx_int_t ngx_http_flv_prepare_message(ngx_rtmp_header_t *h,ngx_chain_t* in, ngx_chain_t *out,unsigned int * out_size)
+ngx_int_t 
+ngx_http_flv_prepare_message(ngx_rtmp_header_t *h, ngx_chain_t* in, ngx_chain_t *out, unsigned int * out_size)
 {
     if(h == NULL || in == NULL  || out == NULL)
         return NGX_ERROR;
@@ -470,146 +474,157 @@ ngx_int_t ngx_http_flv_prepare_message(ngx_rtmp_header_t *h,ngx_chain_t* in, ngx
 
     //tag header
     unsigned int nIndex = 0;
-    if(h->type == NGX_RTMP_MSG_AUDIO)
-    {
+    if (h->type == NGX_RTMP_MSG_AUDIO) {
         data[nIndex++] = 0x08; //类型
-    }
-    else if(h->type == NGX_RTMP_MSG_VIDEO)
-    {
+    } else if (h->type == NGX_RTMP_MSG_VIDEO) {
         data[nIndex++] = 0x09; //类型
-    }
-    else
-    {
+    } else {
         return NGX_ERROR;
     }
-
-	int n_tag_size_pos = nIndex; //tag size pos
+    
+    // data size pos
+	int n_tag_size_pos = nIndex; 
 	nIndex += 3;
-	unsigned char * buf = data+nIndex;
-	FLVFILECOPYSTMP(stamp,buf); //时间戳
-	nIndex += sizeof(int_4);
-	data[nIndex++] = 0;
-	data[nIndex++] = 0;
-	data[nIndex++] = 0;
 
-    //tag_data
+    // timestamp  
+	unsigned char *buf = data+nIndex;
+	FLVFILECOPYSTMP(stamp, buf); 
+	nIndex += sizeof(int_4);
+	// stream id 
+    data[nIndex++] = 0;
+	data[nIndex++] = 0;
+	data[nIndex++] = 0;
+    
+    // tag_data
     buf = data+nIndex;
-    while(in)
-    {
+    while(in) {
         int copy_size = in->buf->last - in->buf->pos;
         memcpy(buf + payload_size,in->buf->pos,copy_size);
         in = in->next;
         payload_size += copy_size;
     }
     nIndex += payload_size; 
-
-    //tag size
+    
+    // pre tag size
     int_4 tag_size = nIndex;
 	tag_size = big_endian_32(tag_size);
 	int nBufLen = data_buf_len - nIndex;
-
-	if(ngx_flv_right_bigger(nBufLen,sizeof(tag_size)))
+    
+	if (ngx_flv_right_bigger(nBufLen, sizeof(tag_size)))
 		return NGX_ERROR;
-
-	nIndex += ngx_flv_mem_cp(data+nIndex,&tag_size,sizeof(tag_size));
-    //data size
-	put_int_to_three_char(data+n_tag_size_pos,payload_size);
+    
+	nIndex += ngx_flv_mem_cp(data+nIndex, &tag_size, sizeof(tag_size));
+    
+    // data size
+	put_int_to_three_char(data+n_tag_size_pos, payload_size);
     *out_size = nIndex;
     out->buf->last = out->buf->pos + nIndex;
     return NGX_OK;
 }
 
-ngx_int_t ngx_http_flv_perpare_header(ngx_rtmp_session_t *session,void * ctx,ngx_rtmp_header_t *h) //header =  flv header tag + mediadata tag + aac_tag +avc_tag
+// header =  flv header tag + mediadata tag + aac_tag + avc_tag(sps pps)
+ngx_int_t 
+ngx_http_flv_perpare_header(ngx_rtmp_session_t *session, void *ctx, ngx_rtmp_header_t *h) 
 {
-   if(ctx == NULL || h == NULL)
+   if (ctx == NULL || h == NULL)
         return NGX_ERROR;
 
     ngx_rtmp_codec_ctx_t  *codec_ctx = ngx_rtmp_get_module_ctx(session, ngx_rtmp_codec_module);
-    if(codec_ctx == NULL)
+    if (codec_ctx == NULL)
         return NGX_ERROR;
 
-    ngx_http_rtmp_live_ctx_t * hctx = (ngx_http_rtmp_live_ctx_t*)ctx;
-    ngx_http_rtmp_live_stream_t *s = hctx->stream;
-    if(s == NULL)
+    ngx_http_rtmp_live_ctx_t *hctx = (ngx_http_rtmp_live_ctx_t*)ctx;
+    ngx_http_rtmp_live_stream_t *stream = hctx->stream;
+    if (stream == NULL)
         return NGX_ERROR;
-    if( s->meta_conf_tag == NULL){
-        s->meta_conf_tag = ngx_http_flv_base_alloc_tag_mem(s->tag_buf_len);
+    
+    // 缓存 meta data 
+    if ( stream->meta_conf_tag == NULL){
+        stream->meta_conf_tag = ngx_http_flv_base_alloc_tag_mem(stream->tag_buf_len);
     }
-    if(s->meta_conf_tag){
-        s->meta_conf_tag->buf->pos = s->meta_conf_tag->buf->last;
-        s->meta_tag_size = 0;
-    }else
+
+    if (stream->meta_conf_tag){
+        stream->meta_conf_tag->buf->pos = stream->meta_conf_tag->buf->last;
+        stream->meta_tag_size = 0;
+    } else {
         return NGX_ERROR;
+    }
 
-    u_char *flv = s->meta_conf_tag->buf->pos;
+    u_char *flv = stream->meta_conf_tag->buf->pos;
     ngx_int_t flv_len  = 0;
-    unsigned int flv_header_size = 0;
-
+    unsigned int flv_header_size = 0;    
     unsigned int buf_len = 0;
-    bool need_duration_and_filesize = false;
+    int need_duration_and_filesize = 0;
     unsigned int duration_pos = 0;
     unsigned int file_size_pos = 0;
 
     ngx_flv_media_data_t meta;
-    meta.video_fps = s->frame_rate; //视频帧率
-	meta.video_width = s->width; //视频宽
-	meta.video_height = s->height;// 视频高
-	meta.audio_samplerate = s->sample_rate;
-    meta.audio_samplesize = s->sample_size;
-    meta.video_data_rate = s->video_data_rate;
-    meta.audio_data_rate = 0;
-
+    memset(&meta, 0, sizeof(ngx_flv_media_data_t));
+    meta.video_fps          = stream->frame_rate;   // 视频帧率
+	meta.video_width        = stream->width;        // 视频宽
+	meta.video_height       = stream->height;       // 视频高
+	meta.audio_samplerate   = stream->sample_rate;
+    meta.audio_samplesize   = stream->sample_size;
+    meta.video_data_rate    = stream->video_data_rate;
+    meta.audio_data_rate    = 0;
+    
     unsigned int meta_data_size = 0;
     u_char *buf = NULL;
-    // flv tag
-    bool  has_video = codec_ctx->aac_header == NULL ? false : true;
-    bool  has_audio = codec_ctx->avc_header == NULL ? false : true;
-    memset(&meta,0,sizeof(ngx_flv_media_data_t));
-
-    if(ngx_perpare_flv_header(flv,has_video,has_audio,&flv_header_size) == NGX_ERROR)
-        return NGX_ERROR;
     
+    // flv header
+    int has_video = codec_ctx->aac_header == NULL ? 0 : 1;
+    int has_audio = codec_ctx->avc_header == NULL ? 0 : 1;
+    if (ngx_perpare_flv_header(flv, has_video, has_audio, &flv_header_size) == NGX_ERROR)
+        return NGX_ERROR;
     flv_len += flv_header_size;
 
     buf  = flv + flv_len;
-    buf_len = s->tag_buf_len - flv_len;
-    //media data tag
-    if(ngx_prepare_flv_media_data(buf,buf_len,has_video,has_audio,need_duration_and_filesize,&duration_pos,&file_size_pos,meta,&meta_data_size) == NGX_ERROR)
+    buf_len = stream->tag_buf_len - flv_len;
+    // media data tag
+    if (ngx_prepare_flv_media_data(buf, buf_len, has_video, has_audio, need_duration_and_filesize, &duration_pos, &file_size_pos, meta, &meta_data_size) == NGX_ERROR)
         return NGX_ERROR;
 
     flv_len += meta_data_size;
     uint8_t                 hhh_type = h->type; 
-    s->meta_tag_size = flv_len;
-    s->meta_conf_tag->buf->last = s->meta_conf_tag->buf->pos + flv_len;
-    if(has_audio) //audio header
-    {
-        if( s->aac_conf_tag == NULL){
-            s->aac_conf_tag = ngx_http_flv_base_alloc_tag_mem(s->tag_buf_len);
-        }
-        if(s->aac_conf_tag){
-            s->aac_conf_tag->buf->pos = s->aac_conf_tag->buf->last;
-            s->aac_tag_size = 0;
-        }else
+    stream->meta_tag_size = flv_len;
+    stream->meta_conf_tag->buf->last = stream->meta_conf_tag->buf->pos + flv_len;
+    
+    // 缓存 AAC 
+    // audio header tag
+    if (has_audio) {
+        if (stream->aac_conf_tag == NULL) 
+            stream->aac_conf_tag = ngx_http_flv_base_alloc_tag_mem(stream->tag_buf_len);
+        
+        if (stream->aac_conf_tag) {
+            stream->aac_conf_tag->buf->pos = stream->aac_conf_tag->buf->last;
+            stream->aac_tag_size = 0;
+        } else {
             return NGX_ERROR;
+        }
+        
         h->type = NGX_RTMP_MSG_AUDIO;
-        if(ngx_http_flv_prepare_message(h,codec_ctx->aac_header,s->aac_conf_tag,&s->aac_tag_size) == NGX_ERROR)
+        if (ngx_http_flv_prepare_message(h, codec_ctx->aac_header, stream->aac_conf_tag, &stream->aac_tag_size) == NGX_ERROR)
+            return NGX_ERROR;
+    }
+    
+    // 缓存 AVC
+    // video header tag
+    if (has_video) {
+        if ( stream->avc_conf_tag == NULL)
+            stream->avc_conf_tag = ngx_http_flv_base_alloc_tag_mem(stream->tag_buf_len);
+        
+        if (stream->aac_conf_tag) {
+            stream->avc_conf_tag->buf->pos = stream->avc_conf_tag->buf->last;
+            stream->avc_tag_size = 0;
+        } else {
+            return NGX_ERROR;
+        }
+        
+        h->type = NGX_RTMP_MSG_VIDEO;
+        if (ngx_http_flv_prepare_message(h, codec_ctx->avc_header, stream->avc_conf_tag, &stream->avc_tag_size) == NGX_ERROR)
             return NGX_ERROR;
     }
 
-    if(has_video)//video header
-    {
-        if( s->avc_conf_tag == NULL){
-            s->avc_conf_tag = ngx_http_flv_base_alloc_tag_mem(s->tag_buf_len);
-        }
-        if(s->aac_conf_tag){
-            s->avc_conf_tag->buf->pos = s->avc_conf_tag->buf->last;
-            s->avc_tag_size = 0;
-        }else
-            return NGX_ERROR;
-        h->type = NGX_RTMP_MSG_VIDEO;
-        if(ngx_http_flv_prepare_message(h,codec_ctx->avc_header,s->avc_conf_tag,&s->avc_tag_size) == NGX_ERROR)
-            return NGX_ERROR;
-    }
     h->type = hhh_type;
     return NGX_OK;
 }

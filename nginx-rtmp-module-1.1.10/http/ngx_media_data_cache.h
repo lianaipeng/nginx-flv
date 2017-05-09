@@ -41,7 +41,8 @@ ngx_chain_t* ngx_media_data_cache_write(ngx_rtmp_session_t* s, ngx_rtmp_header_t
                                         ngx_chain_t* in,ngx_rtmp_header_t *ch,
                                         ngx_rtmp_header_t *lh,ngx_int_t type);
 
-ngx_int_t ngx_media_data_cache_send(ngx_rtmp_session_t* s,void* ctx,ngx_int_t type);
+ngx_int_t 
+ngx_media_data_cache_send(ngx_rtmp_session_t *s, void *ctx, ngx_int_t type);
 
 ngx_int_t ngx_media_data_cahce_clear(ngx_rtmp_session_t* s,ngx_int_t type);
 

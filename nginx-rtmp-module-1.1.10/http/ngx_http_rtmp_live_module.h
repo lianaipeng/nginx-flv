@@ -85,7 +85,9 @@ struct ngx_http_rtmp_live_stream_s {
 
 extern ngx_module_t  ngx_http_rtmp_live_module;
 
-ngx_int_t ngx_http_rtmp_live_play(void* http_ctx);
+ngx_int_t 
+ngx_http_rtmp_live_play(void *http_ctx);
 
-ngx_int_t ngx_http_rtmp_live_close_play_stream(void* http_ctx);
+ngx_int_t 
+ngx_http_rtmp_live_close_play_stream(void *http_ctx);
 #endif

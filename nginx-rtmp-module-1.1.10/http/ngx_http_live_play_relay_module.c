@@ -191,7 +191,7 @@ static ngx_http_live_play_relay_ctx_t*  ngx_http_live_relay_alloc_ctx(ngx_http_l
             if(loc->pool)
             {
                 ctx = (ngx_http_live_play_relay_ctx_t*)ngx_pcalloc(loc->pool,sizeof(ngx_http_live_play_relay_ctx_t));
-                memset(ctx,sizeof(ngx_http_live_play_relay_ctx_t),0);
+                memset(ctx, 0, sizeof(ngx_http_live_play_relay_ctx_t));
             }
         }
     }
@@ -221,7 +221,7 @@ static void ngx_http_live_play_relay_free_ctx(ngx_http_live_play_relay_ctx_t*ctx
        {
            ngx_destroy_pool(ctx->pool);
        } 
-        memset(ctx,sizeof(ngx_http_live_play_relay_ctx_t),0);
+        memset(ctx, 0, sizeof(ngx_http_live_play_relay_ctx_t));
         ctx->next = loc->free_ctx ;
         loc->free_ctx = ctx;
     }
@@ -244,7 +244,8 @@ static void ngx_http_live_netcall_free_peer(ngx_peer_connection_t *pc, void *dat
 {
 }
 
-static void ngx_http_live_netcall_close(ngx_connection_t *cc)
+static void 
+ngx_http_live_netcall_close(ngx_connection_t *cc)
 {
     ngx_http_live_netcall_session_t         *cs;
     ngx_pool_t                         *pool;
@@ -451,7 +452,8 @@ void ngx_http_live_random_str(char* random,int n)
 {
     char metachar[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     srand(time(NULL));
-    for (int i = 0; i < n - 1; i++){
+    int i = 0;
+    for (; i < n - 1; i++) {
         random[i] = metachar[rand() % 62];
     }
     random[n - 1] = '\0';
