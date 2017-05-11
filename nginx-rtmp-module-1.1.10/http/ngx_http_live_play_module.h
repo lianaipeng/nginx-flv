@@ -65,32 +65,48 @@ struct ngx_http_flv_frame_s {
 };
 
 typedef struct {
-    ngx_str_t  stream;
-    ngx_str_t  app;
-    ngx_str_t  suffix;
-    ngx_str_t  md5;
-    ngx_str_t  domain;
-    ngx_str_map_list_t  *param_list_head; //参数头
-    ngx_str_map_list_t  *param_list_tail;//参数尾
-    ngx_str_t  md5_public_key; //MD5 签名key
-    ngx_uint_t  current_send_count;
+    ngx_str_t                        stream;
+    ngx_str_t                        app;
+    ngx_str_t                        suffix;
+    ngx_str_t                        md5;
+    ngx_str_t                        domain;
+    ngx_str_map_list_t              *param_list_head; //参数头
+    ngx_str_map_list_t              *param_list_tail; //参数尾
+    ngx_str_t                        md5_public_key;   //MD5 签名key
+    ngx_uint_t                       current_send_count;
 
-    ngx_event_t  send_header_timeout_ev; //发生header的检测定时器
-    ngx_int_t    send_header_flag; //表示是否发生过http header
+    ngx_event_t                      send_header_timeout_ev; //发生header的检测定时器
+    ngx_int_t                        send_header_flag; //表示是否发生过http header
 
-    ngx_event_t             close;
+    ngx_event_t                      close;
 
-    ngx_http_request_t *s; 
-    ngx_http_live_play_relay_ctx_t *  relay_ctx;
-    uint32_t  current_time;
-    void *       hr_ctx;
+    ngx_http_request_t              *s; 
+    ngx_http_live_play_relay_ctx_t  *relay_ctx;
+    uint32_t                         current_time;
+    void                            *hr_ctx;
+    
+    ngx_chain_t                     *header_chain; //头
 
-    ngx_chain_t *header_chain; //头
+    ngx_http_flv_frame_t            *frame_chain_head; //内容数据，发送就从次链表拿数据发送
+    ngx_http_flv_frame_t            *frame_chain_tail; //内容数据，发送就从次链表拿数据发送
 
-    ngx_http_flv_frame_t *frame_chain_head; //内容数据，发送就从次链表拿数据发送
-    ngx_http_flv_frame_t *frame_chain_tail; //内容数据，发送就从次链表拿数据发送
-
-    ngx_http_flv_frame_t *frame_free;
+    ngx_http_flv_frame_t            *frame_free;
+    
+    // 日志相关
+    ngx_int_t                        log_type;    // 0:关闭, 1:打开,(由0->1 start，1 status )
+    ngx_uint_t                       request_ts; // 请求道来时间 毫秒
+    ngx_uint_t                       current_ts; // 每次数据发送时间 
+    ngx_str_t                        client_ip; 
+    ngx_str_t                        server_ip;
+    ngx_str_t                        host;
+    ngx_str_t                        pull_url;
+    
+    ngx_uint_t                       video_size;
+    ngx_uint_t                       audio_size;
+    ngx_uint_t                       send_frame; 
+    
+    ngx_uint_t                       dropVideoFrame;
+    ngx_uint_t                       cacheVideoFrame; 
 } ngx_http_live_play_request_ctx_t;
 
 typedef struct {

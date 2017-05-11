@@ -42,6 +42,20 @@ struct ngx_rtmp_live_ctx_s {
     unsigned                            paused:1;
 
     ngx_media_data_cache_t              *media_cache;
+    
+    ngx_uint_t                          log_type;
+    ngx_uint_t                          request_ts;
+    ngx_str_t                           client_ip;
+    ngx_str_t                           server_ip;
+    ngx_str_t                           host;
+    ngx_str_t                           pull_url;
+    
+    ngx_uint_t                          video_size;
+    ngx_uint_t                          audio_size;
+    ngx_uint_t                          send_frame; 
+    
+    ngx_uint_t                       dropVideoFrame;
+    ngx_uint_t                       cacheVideoFrame; 
 };
 
 
@@ -89,4 +103,8 @@ typedef struct {
 extern ngx_module_t  ngx_rtmp_live_module;
 
 ngx_int_t   ngx_rtmp_live_find_stream(ngx_rtmp_live_app_conf_t* lacf,u_char* name);
+
+ngx_uint_t  
+ngx_rtmp_live_current_msec();
+
 #endif /* _NGX_RTMP_LIVE_H_INCLUDED_ */

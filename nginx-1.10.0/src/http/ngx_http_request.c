@@ -953,6 +953,7 @@ ngx_http_process_request_line(ngx_event_t *rev)
             r->request_line.len = r->request_end - r->request_start;
             r->request_line.data = r->request_start;
             r->request_length = r->header_in->pos - r->request_start;
+            ngx_log_error(NGX_LOG_INFO, c->log, 0, "WOCAO %s", r->request_line.data);
 
             ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
                            "http request line: \"%V\"", &r->request_line);

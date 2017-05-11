@@ -201,6 +201,7 @@ ngx_rtmp_init_session(ngx_connection_t *c, ngx_rtmp_addr_conf_t *addr_conf)
     */
     ngx_set_connection_log(s->connection, cscf->error_log);
     ngx_set_connection_rtmplog(s->connection, cscf->rtmp_log);
+    global_log = cscf->rtmp_log;
     
     s->out_queue = cscf->out_queue;
     s->out_cork = cscf->out_cork;

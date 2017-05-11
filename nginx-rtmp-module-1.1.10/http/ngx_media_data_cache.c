@@ -536,7 +536,7 @@ ngx_http_flv_send_header(ngx_rtmp_session_t *s, void *ptr)
     
     if (ctx->stream->aac_tag_size > 0){
         printf("send flv header\n");
-        rc = ngx_http_live_send_message(ss, ctx->stream->meta_conf_tag, HTTP_FLV_META_TAG ,ctx->stream->aac_tag_size, 0, 0);
+        rc = ngx_http_live_send_message(ss, ctx->stream->meta_conf_tag, HTTP_FLV_META_TAG , ctx->stream->aac_tag_size, 0, 0);
         if (rc != NGX_OK) {
             return NGX_ERROR;
         }

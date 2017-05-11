@@ -27,9 +27,10 @@ static char *ngx_rtmp_live_set_msec_slot(ngx_conf_t *cf, ngx_command_t *cmd,
        void *conf);
 static void ngx_rtmp_live_start(ngx_rtmp_session_t *s);
 static void ngx_rtmp_live_stop(ngx_rtmp_session_t *s);
-static void
-ngx_rtmp_live_bandwidth_tochar(ngx_uint_t bandwidth, u_char * buf, size_t size);
+// static void ngx_rtmp_live_bandwidth_tochar(ngx_uint_t bandwidth, u_char * buf, size_t size);
 
+static void 
+ngx_rtmp_live_init_log(ngx_rtmp_session_t *s, ngx_rtmp_live_ctx_t *ctx);
 
 static ngx_command_t  ngx_rtmp_live_commands[] = {
 
@@ -655,13 +656,27 @@ ngx_rtmp_live_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
         ngx_rtmp_live_stop(s);
     }
 
+
+    ngx_uint_t  current_ts = ngx_rtmp_live_current_msec();
+    char *szformat = NULL;
+    u_char ses[32] = {'\0'};
+    ngx_sprintf(ses, "%l_%d", current_ts, s->connection->fd);
+
     if (ctx->publishing) {
         ngx_rtmp_send_status(s, "NetStream.Unpublish.Success",
                              "status", "Stop publishing");
+
+        szformat = "{_type:v2.edgePushStop,timestamp:%l,ses:%s,clientIP:%V,serverIP:%V,host:%V,name:%s,protocolType:rtmp,recvVideoSize:%l,recvAudioSize:%l,recvVideoFrame:%l,sendVideoSize:%l,sendAudioSize:%l}";
+        ngx_log_error(NGX_LOG_ERR, global_log, 0, szformat, current_ts, ses, &ctx->client_ip, &ctx->server_ip, &ctx->host, ctx->stream->name, ctx->stream->bw_in_video, ctx->stream->bw_in_audio, 0, 0, 0);
         if (!lacf->idle_streams) {
             for (pctx = ctx->stream->ctx; pctx; pctx = pctx->next) {
                 if (pctx->publishing == 0) {
                     ss = pctx->session;
+                    
+                    ngx_sprintf(ses, "%l_%d", current_ts, ss->connection->fd);
+                    szformat = "{_type:v2.edgePullStop,timestamp:%l,ses:%s,clientIP:%V,serverIP:%V,host:%V,name:%s,protocolType:rtmp,pullUrl:%V,duration:%l,statusCode:NGX_OK,videoSize:%l,audioSize:%l,allDropFrame:%l}";
+                    ngx_log_error(NGX_LOG_ERR, global_log, 0, szformat, current_ts, ses, &pctx->client_ip, &pctx->server_ip, &pctx->host, pctx->stream->name, &pctx->pull_url, 0, pctx->video_size, pctx->audio_size, 0);
+
                     ngx_log_debug0(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0,
                                    "live: no publisher");
                     ngx_rtmp_finalize_session(ss);
@@ -669,7 +684,10 @@ ngx_rtmp_live_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
             }
         }
 
-        ngx_log_error(NGX_LOG_INFO, s->connection->rtmp_log, 0, ",STOP, timestamp:%uL stream_name:%s ", ngx_cached_time->sec, ctx->stream->name);
+        // ngx_log_error(NGX_LOG_INFO, s->connection->rtmp_log, 0, ",STOP, timestamp:%uL stream_name:%s ", ngx_cached_time->sec, ctx->stream->name);
+    } else {
+        szformat = "{_type:v2.edgePullStop,timestamp:%l,ses:%s,clientIP:%V,serverIP:%V,host:%V,name:%s,protocolType:rtmp,pullUrl:%V,duration:%l,statusCode:NGX_OK,videoSize:%l,audioSize:%l,allDropFrame:%l}";
+        ngx_log_error(NGX_LOG_ERR, global_log, 0, szformat, current_ts, ses, &ctx->client_ip, &ctx->server_ip, &ctx->host, ctx->stream->name, &ctx->pull_url, 0, ctx->video_size, ctx->audio_size, 0);
     }
 
     if (ctx->stream->ctx) {
@@ -744,10 +762,22 @@ next:
     return next_pause(s, v);
 }
 
+
+ngx_uint_t  
+ngx_rtmp_live_current_msec()
+{
+    ngx_uint_t  sec, msec;
+    sec = ngx_cached_time->sec;
+    msec = ngx_cached_time->msec;
+    
+    return sec*1000+msec;
+}
 static ngx_int_t
 ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
-                 ngx_chain_t *in)
+        ngx_chain_t *in)
 {
+    printf("############## %ld %s\n", s->addr_text->len, s->addr_text->data);
+    
     ngx_rtmp_live_ctx_t            *ctx, *pctx;
     ngx_rtmp_codec_ctx_t           *codec_ctx;
     ngx_chain_t                    *header, *coheader, *meta,
@@ -919,6 +949,12 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     /* broadcast to all subscribers */
 
+    // 日志相关
+    ngx_uint_t  current_ts = ngx_rtmp_live_current_msec();
+    char *szformat = NULL;
+    u_char ses[32] = {'\0'};
+
+
     for (pctx = ctx->stream->ctx; pctx; pctx = pctx->next) {
         if (pctx == ctx || pctx->paused) {
             continue;
@@ -926,6 +962,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
         ss = pctx->session;
         cs = &pctx->cs[csidx];
+
 
         /* send metadata */
 
@@ -1086,10 +1123,28 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         }
 
         cs->timestamp += delta;
-         printf("ngx_rtmp_send_message %s %d\n",type_s,cs->timestamp);
+        printf("ngx_rtmp_send_message %s %d\n",type_s,cs->timestamp);
         ++peers;
         ss->current_time = cs->timestamp;
-    }
+
+        ngx_sprintf(ses, "%l_%d", current_ts, ss->connection->fd);
+        if (h->type == NGX_RTMP_MSG_AUDIO) {
+            pctx->audio_size += h->mlen;
+        } else if (h->type == NGX_RTMP_MSG_VIDEO){
+            pctx->video_size += h->mlen;       
+        }
+        pctx->send_frame += 1;
+
+        if (pctx->log_type == 0) {
+            szformat = "{_type:v2.edgePullStart,timestamp:%l,ses:%s,clientIP:%V,serverIP:%V,host:%V,name:%s,protocolType:rtmp,responseTime:%l,pullUrl:%V}";
+            ngx_log_error(NGX_LOG_ERR, global_log, 0, szformat, current_ts, ses, &pctx->client_ip, &pctx->server_ip, &pctx->host, pctx->stream->name, current_ts-pctx->request_ts, &pctx->pull_url);
+            
+            pctx->log_type = 1;    
+        } else {
+            szformat = "{_type:v2.edgePullWatch,timestamp:%l,ses:%s,clientIP:%V,serverIP:%V,host:%V,name:%s,protocolType:rtmp,pullUrl:%V,pts:%l,videoSize:%l,audioSize:%l,delay:%l,sendFrame:%l,dropVideoFrame:%l,cacheVideoFrame:%l}";
+            ngx_log_error(NGX_LOG_ERR, global_log, 0, szformat, current_ts, ses, &pctx->client_ip, &pctx->server_ip, &pctx->host, pctx->stream->name, &pctx->pull_url, h->timestamp, pctx->video_size, pctx->audio_size, delta, pctx->send_frame, pctx->dropVideoFrame, pctx->cacheVideoFrame);
+        }
+    } // end for send 
 
     if (rpkt && rpkt_destory) {
         ngx_rtmp_free_shared_chain(cscf, rpkt);
@@ -1114,8 +1169,21 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                               &ctx->stream->bw_in_audio :
                               &ctx->stream->bw_in_video,
                               h->mlen);
-
     
+    
+    ngx_sprintf(ses, "%l_%d", current_ts, s->connection->fd);
+    // if (ctx->log_type == 0) {
+    if (ctx->log_type == 1) {
+        szformat = "{_type:v2.edgePushStart,timestamp:%l,ses:%s,clientIP:%V,serverIP:%V,host:%V,name:%s,protocolType:rtmp,firstRecvTime:%l,pullUrl:%V,vFormat:h264,vFps:%l,vBitRate:%l,aFormat:aac,aChannel:%l,aSamplerate:%l}";
+        ngx_log_error(NGX_LOG_ERR, global_log, 0, szformat, current_ts, ses, &ctx->client_ip, &ctx->server_ip, &ctx->host, ctx->stream->name, current_ts, &ctx->pull_url, 0, 0, codec_ctx->audio_channels, codec_ctx->sample_rate);
+        
+        ctx->log_type = 1;    
+    } else {
+        szformat = "{_type:v2.edgePushWatch,timestamp:%l,ses:%s,clientIP:%V,serverIP:%V,host:%V,name:%s,protocolType:rtmp,recvVideoSize:%l,recvAudioSize:%l,recvVideoFrame:%l,sendVideoSize:%l,sendAudioSize:%l}";
+        ngx_log_error(NGX_LOG_ERR, global_log, 0, szformat, current_ts, ses, &ctx->client_ip, &ctx->server_ip, &ctx->host, ctx->stream->name, ctx->stream->bw_in_video, ctx->stream->bw_in_audio, 0, 0, 0);
+    }
+    
+    /*
     // 打印日志 
     ngx_uint_t log_cts = ngx_cached_time->sec;
     ngx_uint_t log_delta = log_cts - ctx->stream->log_lts;
@@ -1133,10 +1201,12 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                 log_cts, ctx->stream->name, video_buf, audio_buf, codec->frame_rate, codec->sample_rate, codec->audio_channels);
         ctx->stream->log_lts = log_cts;
     }
+    */
 
     return NGX_OK;
 }
 
+/*
 static void
 ngx_rtmp_live_bandwidth_tochar(ngx_uint_t bandwidth, u_char * buf, size_t size)
 {
@@ -1153,8 +1223,57 @@ ngx_rtmp_live_bandwidth_tochar(ngx_uint_t bandwidth, u_char * buf, size_t size)
     }
     //printf("ngx_rtmp_live_module ngx_rtmp_live_bandwidth_tochar:%ld, %s\n", bandwidth, buf);
 }
+*/
 
 
+static void 
+ngx_rtmp_live_init_log(ngx_rtmp_session_t *s, ngx_rtmp_live_ctx_t *ctx)
+{
+    // 获取client ip
+    struct sockaddr_in  *sin;
+    sin = (struct sockaddr_in *)s->connection->sockaddr;
+    char *client;
+    client  = inet_ntoa(sin->sin_addr);
+    
+    ctx->client_ip.len = ngx_strlen(client)+1;
+    ctx->client_ip.data = ngx_pcalloc(s->connection->pool, ctx->client_ip.len);
+    ngx_memzero(ctx->client_ip.data, ctx->client_ip.len);
+    ngx_memcpy(ctx->client_ip.data, client, (size_t)ngx_strlen(client));
+    
+    // 获取server ip
+    u_char      server[128];
+    u_char      ch;
+    ngx_uint_t   i = 0;
+    ngx_memzero(server, 128);
+    do {
+        ch = s->addr_text->data[i];
+        server[i] = ch;
+        i++;
+
+    } while (ch != ':' && ch != '\0');
+    server[i-1] = '\0';
+    
+    ctx->server_ip.len = i-1;
+    ctx->server_ip.data = ngx_pcalloc(s->connection->pool, i);
+    ngx_memzero(ctx->server_ip.data, i);
+    ngx_memcpy(ctx->server_ip.data, server, ctx->server_ip.len);
+    
+    // host 
+    printf("############## %ld %s\n", s->addr_text->len, s->addr_text->data);
+    ctx->host.len = s->addr_text->len;
+    ctx->host.data = s->addr_text->data;
+    
+    printf("######### client:%s  server:%s %s %s\n", client, server, s->tc_url.data, ctx->stream->name);
+    // url
+    i = s->tc_url.len + ngx_strlen(ctx->stream->name);
+    ctx->pull_url.len = i+2;
+    ctx->pull_url.data = ngx_pcalloc(s->connection->pool, i+2);
+    ngx_memzero(ctx->pull_url.data , i+2);
+    
+    ngx_memcpy(ctx->pull_url.data, s->tc_url.data , s->tc_url.len);
+    ctx->pull_url.data[s->tc_url.len] = '/';
+    ngx_memcpy(ctx->pull_url.data + s->tc_url.len + 1 , ctx->stream->name, ngx_strlen(ctx->stream->name));   
+}
 static ngx_int_t
 ngx_rtmp_live_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 {
@@ -1179,6 +1298,7 @@ ngx_rtmp_live_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     if (ctx == NULL || !ctx->publishing) {
         goto next;
     }
+    ngx_rtmp_live_init_log(s, ctx);
     
     // 打印日志
     ngx_log_error(NGX_LOG_INFO, s->connection->rtmp_log, 0, ",START, timestamp:%uL stream_name:%s", ngx_cached_time->sec, ctx->stream->name);
@@ -1220,6 +1340,8 @@ ngx_rtmp_live_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
     if (ctx == NULL) {
         goto next;
     }
+    ctx->request_ts = ngx_rtmp_live_current_msec();
+    ngx_rtmp_live_init_log(s, ctx);
 
     ctx->silent = v->silent;
 

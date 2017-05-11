@@ -336,12 +336,39 @@ ngx_http_rtmp_live_update_audio_av_header(ngx_rtmp_session_t *s, ngx_rtmp_header
     return NGX_OK;
 }
 
+
+void
+ngx_http_rtmp_live_socket(struct sockaddr *sockaddr)
+{
+    struct sockaddr_in  *sin;
+    sin = (struct sockaddr_in *)sockaddr;
+    printf("ngx_http_rtmp_live_socket local_ip:%s time:%ld\n", inet_ntoa(sin->sin_addr), ngx_cached_time->msec);
+}
+
+ngx_uint_t  
+ngx_http_rtmp_live_current_msec()
+{
+    ngx_uint_t  sec, msec;
+    sec = ngx_cached_time->sec;
+    msec = ngx_cached_time->msec;
+    
+    return sec*1000+msec;
+}
+
+
 // bool bIsFirst = true;
 FILE * fp = NULL;
 int  frame_num = 0;
 static ngx_int_t 
 ngx_http_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, ngx_chain_t *in)
 {
+    /*
+    ngx_http_rtmp_live_socket(s->connection->sockaddr);
+    printf("asdasfasdfasdf\n");
+    ngx_http_rtmp_live_session();
+    ngx_http_rtmp_live_socket(s->connection->listening->sockaddr);
+    */
+
     ngx_http_rtmp_live_ctx_t       *ctx,*pctx;
     ngx_rtmp_codec_ctx_t           *codec_ctx;
     ngx_http_rtmp_live_app_conf_t       *lacf;
@@ -422,7 +449,7 @@ ngx_http_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, ngx_chain_t *
     } else { 
         return NGX_OK;
     }
-    
+
     if (ngx_rtmp_is_codec_header(in)) {
         if (h->type == NGX_RTMP_MSG_VIDEO) {
             printf("video codec packet\n");
@@ -436,6 +463,7 @@ ngx_http_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, ngx_chain_t *
         if (ctx->stream->flv_header_update) {
             if (ngx_http_flv_perpare_header(s, (void*)ctx, h) != NGX_OK)
                 return NGX_OK;
+            // ngx_log_error(NGX_LOG_INFO, s->connection->rtmp_log, 0, "WOCAO fd:%ldEND addr_text:%s laddr_text:%s", s->connection->fd, s->connection->addr_text.data, s->connection->listening->addr_text.data);
         }
     }
 
@@ -471,6 +499,9 @@ ngx_http_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, ngx_chain_t *
     */
     mlen = rpkt->buf->last - rpkt->buf->pos;
 
+    // 获取当前时间 单位毫秒（打印日志使用）
+    ngx_uint_t  current_ts = ngx_http_rtmp_live_current_msec();
+    
     for (pctx = ctx->stream->ctx; pctx; pctx = pctx->next) {
         if (pctx == ctx) 
             continue;
@@ -478,6 +509,8 @@ ngx_http_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, ngx_chain_t *
         req_ctx = pctx->http_ctx;
         cs = &pctx->cs[csidx];
 
+        req_ctx->current_ts = current_ts;
+        
         if (meta_version != pctx->meta_version || ctx->stream->flv_header_update) {
             // 判断是否发送头
             if (meta_version != pctx->meta_version ) {

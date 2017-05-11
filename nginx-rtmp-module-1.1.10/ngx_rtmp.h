@@ -371,6 +371,8 @@ typedef struct {
 #define NGX_RTMP_APP_CONF               0x08000000
 #define NGX_RTMP_REC_CONF               0x10000000
 
+// ngx_uint_t                              global_log;
+ngx_log_t                              *global_log;
 
 #define NGX_RTMP_MAIN_CONF_OFFSET  offsetof(ngx_rtmp_conf_ctx_t, main_conf)
 #define NGX_RTMP_SRV_CONF_OFFSET   offsetof(ngx_rtmp_conf_ctx_t, srv_conf)

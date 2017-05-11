@@ -346,32 +346,40 @@ ngx_parse_args(ngx_http_request_t *r, ngx_http_live_play_request_ctx_t *pr)
 static void 
 ngx_http_live_play_close_request(ngx_http_request_t * r)
 {
-    ngx_http_live_play_request_ctx_t *  hctx = (ngx_http_live_play_request_ctx_t*)ngx_http_get_module_ctx(r,ngx_http_live_play_module);	
+    ngx_http_live_play_request_ctx_t *  pr = (ngx_http_live_play_request_ctx_t*)ngx_http_get_module_ctx(r,ngx_http_live_play_module);	
       
-    if (hctx->send_header_timeout_ev.timer_set) {
-        ngx_del_timer(&hctx->send_header_timeout_ev);
+    if (pr->send_header_timeout_ev.timer_set) {
+        ngx_del_timer(&pr->send_header_timeout_ev);
     }
 
-    //删除
-    ngx_http_rtmp_live_close_play_stream((void*)hctx);
+    // 获取日志唯一id
+    u_char session[32] = {'\0'};
+    ngx_sprintf(session, "%l_%d", pr->current_ts, r->connection->fd);
+
+    char *szformat = NULL;
+    szformat = "{_type:v2.edgePullStop,timestamp:%l,session:%s,clientIP:%V,serverIP:%V,host:%V,name:%V,protocolType:http-flv,pullUrl:%V,duration:%l,statusCode:%s,videoSize:%l,audioSize:%l,allDropFrame:%l}";
+    ngx_log_error(NGX_LOG_ERR, global_log, 0, szformat, pr->current_ts, session, &pr->client_ip, &pr->server_ip, &pr->host, &pr->stream, &pr->pull_url, pr->current_ts-pr->request_ts, "NGX_OK",pr->video_size, pr->audio_size, pr->dropVideoFrame);
     
-    if(hctx->frame_chain_head)
+    //删除
+    ngx_http_rtmp_live_close_play_stream((void*)pr);
+    
+    if(pr->frame_chain_head)
     {
-        ngx_http_flv_frame_t *frame = hctx->frame_chain_head;
+        ngx_http_flv_frame_t *frame = pr->frame_chain_head;
         while(frame)
         {
             ngx_http_flv_free_tag_mem(frame->out);
             frame->out = NULL;
-            if(hctx->frame_chain_head)
+            if(pr->frame_chain_head)
             {
-                frame = hctx->frame_chain_head->next;
-                hctx->frame_chain_head = frame->next;
+                frame = pr->frame_chain_head->next;
+                pr->frame_chain_head = frame->next;
             }
             else
                 break;
         }
     }
-    hctx->frame_chain_head = hctx->frame_chain_tail = NULL;
+    pr->frame_chain_head = pr->frame_chain_tail = NULL;
 
     r->connection->destroyed = 1;
     if(r->connection->write != NULL && r->connection->write->timer_set)
@@ -470,14 +478,13 @@ ngx_http_live_play_recv_handler(ngx_event_t *ev)
 static void 
 ngx_http_live_play_write_handler(ngx_event_t *ev)
 {
-    //ngx_chain_t * cl;
-    ngx_connection_t * c = (ngx_connection_t*)ev->data;
-    ngx_http_request_t *r = (ngx_http_request_t*)c->data;
-	ngx_http_live_play_request_ctx_t *  hctx = (ngx_http_live_play_request_ctx_t*)ngx_http_get_module_ctx(r,ngx_http_live_play_module);	
+    ngx_connection_t    *c = (ngx_connection_t*)ev->data;
+    ngx_http_request_t  *r = (ngx_http_request_t*)c->data;
+	ngx_http_live_play_request_ctx_t *hctx = (ngx_http_live_play_request_ctx_t*)ngx_http_get_module_ctx(r,ngx_http_live_play_module);	
      ngx_http_live_play_loc_conf_t* hlplc = NULL;
     hlplc = (ngx_http_live_play_loc_conf_t*)ngx_http_get_module_loc_conf(r, ngx_http_live_play_module);
     ngx_int_t                   n;
-    // printf("ngx_http_live_play_write_handler\n");
+    printf("ngx_http_live_play_write_handler global_log:%p\n", global_log);
     if (c->destroyed){
         ev->error = 1;
         return;
@@ -499,11 +506,14 @@ ngx_http_live_play_write_handler(ngx_event_t *ev)
         ngx_del_timer(ev);
     }
 
+
     if (hctx->frame_chain_head) {
-        ngx_http_flv_frame_t * frame = hctx->frame_chain_head;
+        // 取一帧发送
+        ngx_http_flv_frame_t *frame = hctx->frame_chain_head;
         hctx->frame_chain_head = frame->next;
         frame->next = NULL;
         while (frame) {
+            // 发送大小
             ngx_uint_t send_len = frame->out->buf->last - frame->out->buf->pos;
             while (send_len > 0) {
                 ngx_int_t send_one_len = hlplc->http_send_chunk_size > send_len ? send_len : hlplc->http_send_chunk_size;
@@ -513,7 +523,7 @@ ngx_http_live_play_write_handler(ngx_event_t *ev)
                         || (n < send_one_len && n > 0 )
                         || hctx->current_send_count > hlplc->http_send_max_chunk_count ) {
                     hctx->current_send_count  = 0;
-
+                    
                     if(n > 0 &&  n <= send_one_len)
                         frame->out->buf->pos += n;
 
@@ -527,7 +537,7 @@ ngx_http_live_play_write_handler(ngx_event_t *ev)
                     }
                     return;
                 } else {
-
+                    
                     if (n < 0) {
                         ngx_http_live_play_close_request(r);
                         printf("ngx_handle_write_event send data fail\n");
@@ -538,20 +548,20 @@ ngx_http_live_play_write_handler(ngx_event_t *ev)
                     send_len -= n;
                 }
             }
-
+            
             hctx->current_send_count = 0;
-
+            
             ngx_http_flv_free_tag_mem(frame->out);
             frame->out = NULL;
             free_http_flv_frame(hctx,frame);
             frame = NULL;
-
-            if (hctx->frame_chain_head){
+            
+            if (hctx->frame_chain_head) {
                 frame =  hctx->frame_chain_head;
                 hctx->frame_chain_head = frame->next;
                 frame->next = NULL;
             }
-            if (hctx->frame_chain_head == NULL){
+            if (hctx->frame_chain_head == NULL) {
                 hctx->frame_chain_head = hctx->frame_chain_tail = NULL;
             }
         }
@@ -632,6 +642,78 @@ ngx_http_live_paly_join(ngx_http_live_play_request_ctx_t *r)
     return rc;
 }
 
+
+/*
+void
+ngx_http_rtmp_live_socket(ngx_connection_t *c)
+{
+    struct sockaddr_in  *sin;
+    sin = (struct sockaddr_in *)c->sockaddr;
+    printf("ngx_http_rtmp_live_socket local_ip:%s time:%ld\n", inet_ntoa(sin->sin_addr), ngx_cached_time->msec);
+}
+*/
+
+static void 
+ngx_http_live_play_init_log(ngx_http_live_play_request_ctx_t *pr)
+{
+    ngx_http_request_t      *r;
+
+    pr->log_type = 0;
+    pr->request_ts = ngx_rtmp_live_current_msec();
+
+    r = pr->s;
+
+    struct sockaddr_in  *sin;
+    sin = (struct sockaddr_in *)r->connection->sockaddr;
+    char *client;
+    client  = inet_ntoa(sin->sin_addr);
+
+    // 获取client ip 
+    pr->client_ip.len = ngx_strlen(client)+1;
+    pr->client_ip.data = ngx_pcalloc(r->pool, pr->client_ip.len);
+    ngx_memzero(pr->client_ip.data, pr->client_ip.len);
+    ngx_memcpy(pr->client_ip.data, client, (size_t)ngx_strlen(client));
+    // printf("ngx_http_rtmp_live_socket %ld client_ip:%s server_ip:%s\n", ngx_strlen(client), client, r->headers_in.server.data);
+
+
+    // 获取server ip
+    u_char      server[128];
+    u_char      ch;
+    ngx_uint_t   i = 0;
+    ngx_memzero(server, 128);
+    do {
+        ch = r->headers_in.server.data[i];
+        server[i] = ch;
+        i++;
+
+    } while (ch != ':' && ch != '\0');
+    server[i-1] = '\0';
+
+    pr->server_ip.len = i-1;
+    pr->server_ip.data = ngx_pcalloc(r->pool, i);
+    ngx_memzero(pr->server_ip.data, i);
+    ngx_memcpy(pr->server_ip.data, server, pr->server_ip.len);
+
+    // 获取host 
+    // ngx_log_error(NGX_LOG_ERR, global_log, 0, "WOCAOCAO key:%s value:%s\n",r->headers_in.host->key.data, r->headers_in.host->value.data);
+    pr->host.len = r->headers_in.host->value.len;
+    pr->host.data = r->headers_in.host->value.data;
+
+    // 获取 pull url
+    i = 7 + pr->host.len + r->uri.len;
+    pr->pull_url.len = i+1;
+    pr->pull_url.data = ngx_pcalloc(r->pool, i+1);
+    ngx_memzero(pr->pull_url.data , pr->pull_url.len);
+    pr->pull_url.data[0] = 'h';
+    pr->pull_url.data[1] = 't';
+    pr->pull_url.data[2] = 't';
+    pr->pull_url.data[3] = 'p';
+    pr->pull_url.data[4] = ':';
+    pr->pull_url.data[5] = '/';
+    pr->pull_url.data[6] = '/';
+    ngx_memcpy(pr->pull_url.data + 7, pr->host.data, pr->host.len);
+    ngx_memcpy(pr->pull_url.data + 7 + pr->host.len, r->uri.data, r->uri.len);   
+}
 static ngx_int_t 
 ngx_http_live_play_handler(ngx_http_request_t * r)
 {
@@ -670,6 +752,10 @@ ngx_http_live_play_handler(ngx_http_request_t * r)
     pr->header_chain = (ngx_chain_t*)ngx_pcalloc(r->pool,sizeof(ngx_chain_t));
     pr->s = r;
     pr->send_header_flag  = 0;
+
+    // 初始化打印日志相关参数
+    ngx_http_live_play_init_log(pr);
+    
     
     // 纯粹为了打印
     char app[64] = {'\0'};
@@ -739,14 +825,15 @@ ngx_http_live_play_handler(ngx_http_request_t * r)
     return NGX_OK;
 }
 
+
 ngx_int_t 
-ngx_http_live_send_message(ngx_http_live_play_request_ctx_t *r, ngx_chain_t* out, 
+ngx_http_live_send_message(ngx_http_live_play_request_ctx_t *pr, ngx_chain_t* out, 
         u_char mtype, unsigned int mlen, unsigned int pts, unsigned int delta)
 {
-    if(r == NULL || out == NULL || mlen <= 0 || mtype > HTTP_FLV_VIDEO_KEY_FRAME_TAG)
+    if(pr == NULL || out == NULL || mlen <= 0 || mtype > HTTP_FLV_VIDEO_KEY_FRAME_TAG)
         return NGX_ERROR;
 
-    ngx_http_flv_frame_t *frame = alloc_http_flv_frame(r);
+    ngx_http_flv_frame_t *frame = alloc_http_flv_frame(pr);
     if (frame == NULL)
         return NGX_ERROR;
 
@@ -757,18 +844,41 @@ ngx_http_live_send_message(ngx_http_live_play_request_ctx_t *r, ngx_chain_t* out
     frame->out = ngx_http_flv_copy_tag_mem(out);
     frame->next = NULL;
 
-    if (r->frame_chain_head == NULL) {
-        r->frame_chain_head = frame;
-        r->frame_chain_tail = r->frame_chain_head;
+    if (pr->frame_chain_head == NULL) {
+        pr->frame_chain_head = frame;
+        pr->frame_chain_tail = pr->frame_chain_head;
     } else {
-        r->frame_chain_tail->next = frame;
-        r->frame_chain_tail = frame;
+        pr->frame_chain_tail->next = frame;
+        pr->frame_chain_tail = frame;
     }
 
-    if (!r->s->connection->write->active) {
-        ngx_http_live_play_write_handler(r->s->connection->write);
-        printf("ngx_http_live_send_message  send data to net   END\n");
+    if (!pr->s->connection->write->active) {
+        ngx_http_live_play_write_handler(pr->s->connection->write);
+        printf("ngx_http_live_send_message  send data to net ----\n");
         /*return ngx_add_event(r->connection->write, NGX_WRITE_EVENT, NGX_CLEAR_EVENT);*/
+    }
+    
+    // 打印日志
+    ngx_http_request_t  *r = pr->s;
+    char *szformat = NULL;
+    // 获取日志唯一id
+    u_char session[32] = {'\0'};
+
+    ngx_sprintf(session, "%l_%d", pr->current_ts, r->connection->fd);
+    if (pr->log_type == 0) { 
+        szformat = "{_type:v2.edgePullStart,timestamp:%l,session:%s,clientIP:%V,serverIP:%V,host:%V,name:%V,protocolType:http-flv,responseTime:%l,pullUrl:%V}";
+        ngx_log_error(NGX_LOG_ERR, global_log, 0, szformat, pr->current_ts, session, &pr->client_ip, &pr->server_ip, &pr->host, &pr->stream, pr->current_ts-pr->request_ts, &pr->pull_url);
+        pr->log_type = 1;
+    } else {
+        if (mtype == HTTP_FLV_VIDEO_TAG) {
+            pr->video_size += mlen;
+        } else if (mtype == HTTP_FLV_AUDIO_TAG) {
+            pr->audio_size += mlen;
+        }
+        pr->send_frame += 1;
+         
+        szformat = "{_type:v2.edgePullWatch,timestamp:%l,session:%s,clientIP:%V,serverIP:%V,host:%V,name:%V,protocolType:http-flv,pullUrl:%V,pts:%l,videoSize:%l,audioSize:%l,delay:%l,sendFrame:%l,dropVideoFrame:%l,cacheVideoFrame:%l}";
+        ngx_log_error(NGX_LOG_ERR, global_log, 0, szformat, pr->current_ts, session, &pr->client_ip, &pr->server_ip, &pr->host, &pr->stream, &pr->pull_url, pts, pr->video_size, pr->audio_size, delta, pr->send_frame, pr->dropVideoFrame, pr->cacheVideoFrame);
     }
     return NGX_OK;
 }
