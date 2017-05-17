@@ -41,8 +41,15 @@ typedef struct {
     ngx_msec_t http_send_timeout;
     ngx_msec_t http_send_header_timeout;
 
-    ngx_uint_t  http_send_chunk_size; //每次发生包的大小
+    ngx_uint_t  http_send_chunk_size; //每次发送包的大小
     ngx_uint_t  http_send_max_chunk_count; //每次最多发生包的个数
+
+    ngx_str_t  http_live_app;
+    ngx_msec_t http_idle_timeout;
+
+    ngx_flag_t http_play_cache_on;  //播放缓存开启标记
+    ngx_uint_t http_play_cahce_frame_num; //播放最大缓存的帧大小
+    ngx_msec_t http_play_cahce_time_duration; //播放最大缓存的时间长度
 }ngx_http_live_play_loc_conf_t;
 
 typedef struct {
@@ -76,9 +83,12 @@ typedef struct {
     ngx_uint_t                       current_send_count;
 
     ngx_event_t                      send_header_timeout_ev; //发生header的检测定时器
+    ngx_int_t                        send_header_ev_count;
     ngx_int_t                        send_header_flag; //表示是否发生过http header
 
     ngx_event_t                      close;
+    ngx_event_t                      idle_evt;
+
 
     ngx_http_request_t              *s; 
     ngx_http_live_play_relay_ctx_t  *relay_ctx;
@@ -91,11 +101,23 @@ typedef struct {
     ngx_http_flv_frame_t            *frame_chain_tail; //内容数据，发送就从次链表拿数据发送
 
     ngx_http_flv_frame_t            *frame_free;
+
+    ngx_msec_t                      cache_time_duration; //当前缓存时间长度
+    ngx_uint_t                      cache_frame_num; //当前缓存的视频帧数
+    ngx_int_t                       cache_droping;   //丢帧标记
+
+    ngx_int_t                       drop_vframe_num;  //丢弃的视频帧数
+    ngx_int_t                       drop_vduration;   //丢帧视频的时长
+    ngx_uint_t                      drop_video_size; 
+    ngx_uint_t                      drop_audio_size; 
     
     // 日志相关
-    ngx_int_t                        log_type;    // 0:关闭, 1:打开,(由0->1 start，1 status )
-    ngx_uint_t                       request_ts; // 请求道来时间 毫秒
-    ngx_uint_t                       current_ts; // 每次数据发送时间 
+    u_char                           uuid[32];
+
+    ngx_int_t                        log_type;      // 0:关闭, 1:打开,(由0->1 start，1 status )
+    ngx_uint_t                       log_lts; 
+    ngx_uint_t                       request_ts;    // 请求道来时间 毫秒
+    ngx_uint_t                       current_ts;    // 每次数据发送时间 
     ngx_str_t                        client_ip; 
     ngx_str_t                        server_ip;
     ngx_str_t                        host;
@@ -105,6 +127,7 @@ typedef struct {
     ngx_uint_t                       audio_size;
     ngx_uint_t                       send_frame; 
     
+    ngx_flag_t                       start_caton;    // 开始卡顿
     ngx_uint_t                       dropVideoFrame;
     ngx_uint_t                       cacheVideoFrame; 
 } ngx_http_live_play_request_ctx_t;
@@ -113,6 +136,7 @@ typedef struct {
 	char       *rs;
 	ngx_int_t   ret;
 } ngx_http_live_play_header_struct_t;
+
 
 static const ngx_http_live_play_header_struct_t  ngx_http_live_play_status[] =
 {

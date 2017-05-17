@@ -630,7 +630,6 @@ ngx_http_flv_media_data_cache_send(ngx_rtmp_session_t *s, void *ptrctx)
         } else {
             continue;
         }
-        
         rpkt = ln->cache_chain;
         delta = ln->delta;
 
@@ -650,7 +649,7 @@ ngx_http_flv_media_data_cache_send(ngx_rtmp_session_t *s, void *ptrctx)
         type_s = (ln->mtype == NGX_RTMP_MSG_VIDEO ? "video" : "audio");
         cs->timestamp += delta;
         ss->current_time = cs->timestamp;
-        printf("ngx_http_flv_media_data_cache_send send packet %s pts %d size %d\n",type_s,cs->timestamp,mlen);
+        // printf("ngx_http_flv_media_data_cache_send send packet %s pts %d size %d\n",type_s,cs->timestamp,mlen);
         
         ln = ln->next;
         if (ln ==NULL)
@@ -741,6 +740,42 @@ ngx_int_t ngx_media_data_cahce_clear(ngx_rtmp_session_t* s,ngx_int_t type)
             }
             memset(cache,0,sizeof(ngx_media_data_node_t));
         }
+    }
+    return NGX_OK;
+}
+
+//判断冷热流
+ngx_int_t ngx_rtmp_check_up_idle_stream(ngx_rtmp_session_t *s,int type)
+{
+    if(s)
+    {
+         ngx_http_rtmp_live_app_conf_t   *lacf;
+         ngx_rtmp_core_srv_conf_t   *cscf;
+         lacf = ngx_rtmp_get_module_app_conf(s, ngx_http_rtmp_live_module);
+         if(lacf)
+         {
+              cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
+            if(cscf->idle_up_stream_destory > 0)
+            {
+                if(lacf->hdl)
+                {
+                    if(type == HTTP_FLV_PROTOCOL)
+                    {
+                        if((s->current_time - s->busy_time) > cscf->idle_up_stream_destory)
+                        {
+                            return NGX_ERROR;
+                        }
+                    }
+                }
+                else
+                {
+                    if((s->current_time - s->busy_time) > cscf->idle_up_stream_destory)
+                    {
+                        return NGX_ERROR;
+                    }
+                }
+            }
+         }
     }
     return NGX_OK;
 }

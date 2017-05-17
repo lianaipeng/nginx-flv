@@ -91,6 +91,4 @@ ngx_http_rtmp_live_play(void *http_ctx);
 ngx_int_t 
 ngx_http_rtmp_live_close_play_stream(void *http_ctx);
 
-ngx_uint_t  
-ngx_http_rtmp_live_current_msec();
 #endif

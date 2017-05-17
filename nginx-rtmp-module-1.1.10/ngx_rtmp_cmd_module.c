@@ -188,13 +188,16 @@ ngx_rtmp_cmd_connect_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             (uint32_t)v.acodecs, (uint32_t)v.vcodecs,
             (ngx_int_t)v.object_encoding);
 
+    printf("connect tc_url:%s\n", s->tc_url.data);
+
     return ngx_rtmp_connect(s, &v);
 }
-
 
 static ngx_int_t
 ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
 {
+    printf("ngx_rtmp_cmd_module ngx_rtmp_cmd_connect\n");
+
     ngx_rtmp_core_srv_conf_t   *cscf;
     ngx_rtmp_core_app_conf_t  **cacfp;
     ngx_uint_t                  n;
@@ -285,6 +288,8 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
     NGX_RTMP_SET_STRPAR(page_url);
 
 #undef NGX_RTMP_SET_STRPAR
+    
+    printf("$$$$$$$$$$$$$ %s\n", s->tc_url.data);
 
     p = ngx_strlchr(s->app.data, s->app.data + s->app.len, '?');
     if (p) {
@@ -466,10 +471,32 @@ ngx_rtmp_cmd_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t *v)
 }
 
 
+static void 
+ngx_rtmp_cmd_init_name(ngx_rtmp_session_t *s, u_char *name, ngx_uint_t  publisher)
+{
+    s->publishing = publisher;
+    s->status_code = ngx_unknown_close_err;
+    
+    s->name.len = ngx_strlen(name);
+    s->name.data = name;
+    // printf("$$$$$$$$$$$$ name:%s %s\n", name, s->name.data);
+    // printf("$$$$$$$$$$$$ tc_url:%s\n", s->tc_url.data);
+
+    s->pull_url.len = s->tc_url.len + 1 + s->name.len;
+    s->pull_url.data = ngx_pcalloc(s->connection->pool, s->pull_url.len+1);
+    ngx_memzero(s->pull_url.data , s->pull_url.len+1);
+    ngx_memcpy(s->pull_url.data, s->tc_url.data, s->tc_url.len);
+    s->pull_url.data[s->tc_url.len] = '/';
+    ngx_memcpy(s->pull_url.data + s->tc_url.len + 1, s->name.data, s->name.len);   
+    // printf("$$$$$$$$$$$$ pull_url:%s\n", s->pull_url.data);
+}
+
 static ngx_int_t
 ngx_rtmp_cmd_publish_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_chain_t *in)
 {
+    printf("ngx_rtmp_cmd_module ngx_rtmp_cmd_publish_init\n");
+    
     static ngx_rtmp_publish_t       v;
 
     static ngx_rtmp_amf_elt_t      in_elts[] = {
@@ -506,6 +533,8 @@ ngx_rtmp_cmd_publish_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                   "publish: name='%s' args='%s' type=%s silent=%d",
                   v.name, v.args, v.type, v.silent);
 
+    ngx_rtmp_cmd_init_name(s, v.name, 1);
+
     return ngx_rtmp_publish(s, &v);
 }
 
@@ -520,6 +549,8 @@ static ngx_int_t
 ngx_rtmp_cmd_play_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_chain_t *in)
 {
+    s->publishing = 0;
+
     static ngx_rtmp_play_t          v;
 
     static ngx_rtmp_amf_elt_t       in_elts[] = {
@@ -566,7 +597,9 @@ ngx_rtmp_cmd_play_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                   v.name, v.args, (ngx_int_t) v.start,
                   (ngx_int_t) v.duration, (ngx_int_t) v.reset,
                   (ngx_int_t) v.silent);
-
+    
+    ngx_rtmp_cmd_init_name(s, v.name, 0);
+    
     return ngx_rtmp_play(s, &v);
 }
 

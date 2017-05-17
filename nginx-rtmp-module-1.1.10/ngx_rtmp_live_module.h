@@ -43,7 +43,9 @@ struct ngx_rtmp_live_ctx_s {
 
     ngx_media_data_cache_t              *media_cache;
     
+    /*
     ngx_uint_t                          log_type;
+    ngx_uint_t                          log_lts;    // 记录日志使用（5s记录一次）
     ngx_uint_t                          request_ts;
     ngx_str_t                           client_ip;
     ngx_str_t                           server_ip;
@@ -56,6 +58,7 @@ struct ngx_rtmp_live_ctx_s {
     
     ngx_uint_t                       dropVideoFrame;
     ngx_uint_t                       cacheVideoFrame; 
+    */
 };
 
 
@@ -70,8 +73,6 @@ struct ngx_rtmp_live_stream_s {
     ngx_msec_t                          epoch;
     unsigned                            active:1;
     unsigned                            publishing:1;
-    
-    ngx_uint_t                          log_lts;    // 记录日志使用（5s记录一次）
 };
 
 
@@ -102,7 +103,8 @@ typedef struct {
 
 extern ngx_module_t  ngx_rtmp_live_module;
 
-ngx_int_t   ngx_rtmp_live_find_stream(ngx_rtmp_live_app_conf_t* lacf,u_char* name);
+ngx_int_t   
+ngx_rtmp_live_find_stream(ngx_rtmp_live_app_conf_t* lacf, u_char* name);
 
 ngx_uint_t  
 ngx_rtmp_live_current_msec();

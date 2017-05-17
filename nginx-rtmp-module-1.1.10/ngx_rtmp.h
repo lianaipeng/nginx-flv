@@ -230,6 +230,7 @@ typedef struct {
     ngx_msec_t              peer_epoch;
     ngx_msec_t              base_time;
     uint32_t                current_time;
+    uint32_t                busy_time;  //上次分发数据时间
 
     /* ping */
     ngx_event_t             ping_evt;
@@ -265,6 +266,29 @@ typedef struct {
     unsigned                out_buffer:1;
     size_t                  out_queue;
     size_t                  out_cork;
+
+    // 日志相关
+    ngx_int_t               log_type;
+    ngx_uint_t              log_lts;
+    //  基础信息
+    u_char                  uuid[32];
+    ngx_int_t               status_code;
+    ngx_uint_t              publishing;
+    ngx_str_t               client_ip;
+    ngx_str_t               server_ip;
+    ngx_str_t               host;
+    ngx_str_t               name;
+    ngx_str_t               pull_url;
+    //  流量信息
+    ngx_uint_t              recv_video_frame; 
+    ngx_uint_t              recv_video_size;  // 兼容push 和 play
+    ngx_uint_t              recv_audio_size;
+
+    ngx_uint_t              send_video_frame; 
+    ngx_uint_t              send_video_size;
+    ngx_uint_t              send_audio_size;
+    // end 日志相关
+
     ngx_chain_t            *out[0];
 } ngx_rtmp_session_t;
 
@@ -327,6 +351,7 @@ typedef struct ngx_rtmp_core_srv_conf_s {
     size_t                  out_queue;
     size_t                  out_cork;
     ngx_msec_t              buflen;
+    ngx_msec_t              idle_up_stream_destory; // 空闲流的销毁时间
 
     ngx_rtmp_conf_ctx_t    *ctx;
 
@@ -586,7 +611,6 @@ ngx_int_t ngx_rtmp_send_play_status(ngx_rtmp_session_t *s, char *code,
         char* level, ngx_uint_t duration, ngx_uint_t bytes);
 ngx_int_t ngx_rtmp_send_sample_access(ngx_rtmp_session_t *s);
 
-
 /* Frame types */
 #define NGX_RTMP_VIDEO_KEY_FRAME            1
 #define NGX_RTMP_VIDEO_INTER_FRAME          2
@@ -624,4 +648,80 @@ extern ngx_uint_t                           ngx_rtmp_max_module;
 extern ngx_module_t                         ngx_rtmp_core_module;
 
 
+enum ngx_status_code {
+    ngx_normal_close = 0,
+    ngx_unknown_close_err = 1, // 未知
+    ngx_rtmp_connect_err = 2,
+    ngx_rtmp_handshake_done_err = 3,
+    ngx_rtmp_handshake_recv_timedout = 4,
+    ngx_rtmp_handshake_recv_data_err = 5,
+    ngx_rtmp_handshake_recv_read_err = 6,
+    ngx_rtmp_handshake_parsing_challenge_err = 7,
+    ngx_rtmp_handshake_create_challenge_err = 8,
+    ngx_rtmp_handshake_response_err = 9,
+    ngx_rtmp_handshake_send_timedout = 10,
+    ngx_rtmp_handshake_send_data_err = 11,
+    ngx_rtmp_handshake_send_write_err = 12,
+    ngx_rtmp_handshake_write_event_err = 13,
+    
+    ngx_rtmp_handler_in_buf_alloc_err = 14,
+    ngx_rtmp_handler_recv_data_err = 15,
+    ngx_rtmp_handler_recv_read_err = 16,
+    ngx_rtmp_handler_send_ack_err = 17,
+    ngx_rtmp_handler_in_chunk_too_big = 18,
+    ngx_rtmp_handler_message_too_big = 19,
+    ngx_rtmp_handler_send_timedout = 20,
+    ngx_rtmp_handler_send_write_err= 21,
+    ngx_rtmp_handler_out_chunk_too_big = 22,
+    
+
+    ngx_rtmp_live_idle_publisher = 23,
+    ngx_rtmp_live_send_message_err = 24,
+    ngx_rtmp_live_no_stream_err = 25,
+    ngx_rtmp_live_no_publisher_err = 26,
+    ngx_rtmp_live_mandatory_err = 27,
+    ngx_rtmp_live_idel_stream = 28,
+    
+    ngx_rtmp_relay_create_publish_err = 29,
+    ngx_rtmp_relay_publish_disconnect_empty = 30,
+    ngx_rtmp_relay_play_disconnect_empty = 31,
+
+    ngx_rtmp_netcall_err = 32,
+
+    ngx_http_live_recv_handler_err = 33,
+    ngx_http_live_write_handler_err = 34,
+    ngx_http_live_client_timedout = 35,
+    ngx_http_live_write_event_err = 36,
+    ngx_http_live_send_data_err = 37,
+    ngx_http_live_parse_play_uri_err = 38,
+    ngx_http_live_parse_play_arg_err = 39,
+    ngx_http_live_status_403_err = 40,
+    ngx_http_live_stream_rewait_err = 41,
+    ngx_http_live_not_allowed = 42,
+    ngx_http_live_status_302_err = 43,
+    ngx_http_live_send_header_timedout= 44,
+    ngx_http_live_send_data_timedout = 45,
+
+    ngx_http_relay_netcall_timedout = 46,
+    ngx_http_relay_sink_err = 47,
+    ngx_http_relay_alloc_chain_err = 48,
+    ngx_http_relay_create_buf_err = 49,
+    ngx_http_relay_recv_data_err = 50,
+    ngx_http_relay_recv_filter_err = 51,
+    ngx_http_relay_read_event_err = 52,
+    ngx_http_relay_send_timedout = 53,
+    ngx_http_relay_send_chain_err = 54,
+    ngx_http_relay_send_write_err = 55,
+    ngx_http_relay_play_close   = 56,
+
+    ngx_rtmp_status_code_count
+};
+
+/*
+char *
+ngx_rtmp_http_get_status(ngx_int_t  code);
+*/
+
+ngx_uint_t  
+ngx_rtmp_current_msec();
 #endif /* _NGX_RTMP_H_INCLUDED_ */

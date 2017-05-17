@@ -177,9 +177,15 @@ static ngx_command_t  ngx_rtmp_core_commands[] = {
       offsetof(ngx_rtmp_core_srv_conf_t, buflen),
       NULL },
 
+    { ngx_string("idle_up_stream_destory"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_msec_slot,
+      NGX_RTMP_SRV_CONF_OFFSET,
+      offsetof(ngx_rtmp_core_srv_conf_t, idle_up_stream_destory),
+      NULL },
+
       ngx_null_command
 };
-
 
 static ngx_rtmp_module_t  ngx_rtmp_core_module_ctx = {
     NULL,                                   /* preconfiguration */
@@ -269,6 +275,7 @@ ngx_rtmp_core_create_srv_conf(ngx_conf_t *cf)
     conf->publish_time_fix = NGX_CONF_UNSET;
     conf->buflen = NGX_CONF_UNSET_MSEC;
     conf->busy = NGX_CONF_UNSET;
+    conf->idle_up_stream_destory = NGX_CONF_UNSET_MSEC;
 
     return conf;
 }
@@ -297,7 +304,7 @@ ngx_rtmp_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->publish_time_fix, prev->publish_time_fix, 1);
     ngx_conf_merge_msec_value(conf->buflen, prev->buflen, 1000);
     ngx_conf_merge_value(conf->busy, prev->busy, 0);
-
+    ngx_conf_merge_msec_value(conf->idle_up_stream_destory, prev->idle_up_stream_destory, 30000);
     if (prev->pool == NULL) {
         prev->pool = ngx_create_pool(4096, &cf->cycle->new_log);
         if (prev->pool == NULL) {
@@ -806,7 +813,16 @@ ngx_rtmp_core_error_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 ngx_rtmp_core_rtmp_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     //printf("ngx_rtmp_core_module ngx_rtmp_core_rtmp_log conf:%p\n", conf);
-
+    /*
     ngx_rtmp_core_srv_conf_t *cscf = conf;   
     return ngx_log_set_log(cf, &cscf->rtmp_log);
+    */
+
+    ngx_rtmp_core_srv_conf_t *cscf = conf;   
+    char * tmp =  ngx_log_set_log(cf, &cscf->rtmp_log);
+
+    global_log = cscf->rtmp_log;
+    // printf("ngx_rtmp_core_module ngx_rtmp_core_rtmp_log rtmp_log:%p global_log:%p\n", cscf->rtmp_log, global_log);
+    
+    return tmp;
 }

@@ -191,6 +191,9 @@ ngx_http_rtmp_live_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
         goto next;
     }
 
+    if (s->auto_pushed) {
+        goto next;
+    }
     printf("ngx_http_rtmp_live_module name:%s\n", v->name);
 
     ngx_http_rtmp_live_join(lacf, v->name, 1,1,s->connection->pool,RTMP_PROTOCOL,(void*)s);
@@ -336,23 +339,12 @@ ngx_http_rtmp_live_update_audio_av_header(ngx_rtmp_session_t *s, ngx_rtmp_header
     return NGX_OK;
 }
 
-
 void
 ngx_http_rtmp_live_socket(struct sockaddr *sockaddr)
 {
     struct sockaddr_in  *sin;
     sin = (struct sockaddr_in *)sockaddr;
     printf("ngx_http_rtmp_live_socket local_ip:%s time:%ld\n", inet_ntoa(sin->sin_addr), ngx_cached_time->msec);
-}
-
-ngx_uint_t  
-ngx_http_rtmp_live_current_msec()
-{
-    ngx_uint_t  sec, msec;
-    sec = ngx_cached_time->sec;
-    msec = ngx_cached_time->msec;
-    
-    return sec*1000+msec;
 }
 
 
@@ -383,7 +375,6 @@ ngx_http_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, ngx_chain_t *
 
     unsigned int                    mlen = 0;
     u_char                          mtype = 0;
-    // printf("ngx_http_rtmp_live_av\n");
     lacf = ngx_rtmp_get_module_app_conf(s, ngx_http_rtmp_live_module);
     if (lacf == NULL) {
         return NGX_ERROR;
@@ -402,6 +393,10 @@ ngx_http_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, ngx_chain_t *
             printf("live: %s from non-publisher\n",ctx->stream->name);
         return NGX_OK;
     }
+    s->current_time = h->timestamp;
+
+    if(s->busy_time == 0)
+        s->busy_time = s->current_time;
 
     ctx->stream->streaming = 1;
 
@@ -486,7 +481,9 @@ ngx_http_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, ngx_chain_t *
             fwrite(ctx->stream->avc_conf_tag->buf->pos
             ,ctx->stream->avc_conf_tag->buf->last - ctx->stream->avc_conf_tag->buf->pos,1,fp);
             bIsFirst = false;
-        } if(!bIsFirst) {
+        } 
+        
+        if(!bIsFirst) {
             fwrite(rpkt->buf->pos,rpkt->buf->last - rpkt->buf->pos,1,fp);
             printf("ngx_media_data_cache_write size %ld\n",rpkt->buf->last - rpkt->buf->pos);
             if(frame_num++ > 1000)
@@ -500,33 +497,40 @@ ngx_http_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, ngx_chain_t *
     mlen = rpkt->buf->last - rpkt->buf->pos;
 
     // 获取当前时间 单位毫秒（打印日志使用）
-    ngx_uint_t  current_ts = ngx_http_rtmp_live_current_msec();
+    ngx_uint_t  current_ts = ngx_rtmp_current_msec();
     
     for (pctx = ctx->stream->ctx; pctx; pctx = pctx->next) {
-        if (pctx == ctx) 
+        if (pctx == ctx) {
             continue;
-
+        }
+        s->busy_time = s->current_time;
         req_ctx = pctx->http_ctx;
         cs = &pctx->cs[csidx];
 
         req_ctx->current_ts = current_ts;
-        
+
         if (meta_version != pctx->meta_version || ctx->stream->flv_header_update) {
-            // 判断是否发送头
-            if (meta_version != pctx->meta_version ) {
-                if (ngx_http_live_play_send_http_header(req_ctx) !=  NGX_OK)
+            if(meta_version != pctx->meta_version ) // 判断是否发送头
+            {
+                if(ngx_http_live_play_send_http_header(req_ctx) !=  NGX_OK)
                     continue;
             }
-            
-            if (ngx_media_data_cache_send(s, (void*)pctx, HTTP_FLV_PROTOCOL) != NGX_OK)
+            if(ngx_media_data_cache_send(s,(void*)pctx,HTTP_FLV_PROTOCOL) != NGX_OK)
                 continue;
             pctx->meta_version = meta_version;
-        } else {
-            printf(" ****** ngx_http_live_send_message\n");
-            ngx_http_live_send_message(req_ctx, rpkt, mtype, mlen, h->timestamp, delta);
+        }
+        else {
+           // printf(" ****** ngx_http_live_send_message\n");
+            ngx_http_live_send_message(req_ctx,rpkt,mtype,mlen,h->timestamp,delta);
         }
     }
     ctx->stream->flv_header_update = 0;
+
+    //判断如果冷流在一定时间内没有人观看，则把流断开，防止上行带宽过载浪费
+    if(ngx_rtmp_check_up_idle_stream(s,HTTP_FLV_PROTOCOL) !=  NGX_OK){
+        printf("http ngx_rtmp_check_up_idle_stream\n");
+        ngx_rtmp_finalize_session(s);
+    }
     return NGX_OK;
 }
 
@@ -602,9 +606,8 @@ ngx_http_rtmp_live_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *
     }
 
     //删除转推
-    if(hr_ctx->stream->relay_ctx && http_ctx)
-    {
-        ngx_http_live_relay_on_play_close((void*)http_ctx);
+    if (hr_ctx->stream->relay_ctx) {
+        ngx_http_live_relay_on_play_close((void*)(*stream)->relay_ctx);
         (*stream)->relay_ctx = NULL;
     }
 
@@ -622,6 +625,7 @@ ngx_http_rtmp_live_close_play_stream(void* http_ctx)
     ngx_http_rtmp_live_app_conf_t   *lacf;
     ngx_http_rtmp_live_ctx_t * hr_ctx,**cctx;
     ngx_http_rtmp_live_stream_t        **stream;
+
     ngx_http_live_play_request_ctx_t   *ctx = (ngx_http_live_play_request_ctx_t*)http_ctx;
 
     if(ctx == NULL)
@@ -638,11 +642,12 @@ ngx_http_rtmp_live_close_play_stream(void* http_ctx)
         printf("get_http_to_rtmp_module_app_conf error\n");
         return NGX_ERROR;
     }
+    printf("ngx_http_rtmp_live_close_play_stream %lx %lx\n",(unsigned long)ctx,(unsigned long)ctx->s);
 
     for (cctx = &hr_ctx->stream->ctx; *cctx; cctx = &(*cctx)->next) {
         if (*cctx == hr_ctx) {
             *cctx = hr_ctx->next;
-            printf("ngx_http_rtmp_live_close_play_stream\n");
+            printf("ngx_http_rtmp_live_close_play_stream %lx %lx\n",(unsigned long)ctx,(unsigned long)ctx->s);
             break;
         }
     }
@@ -661,7 +666,8 @@ ngx_http_rtmp_live_close_play_stream(void* http_ctx)
     //删除转推
     if(ctx->relay_ctx && ctx->relay_ctx == (*stream)->relay_ctx )
     {
-        ngx_http_live_relay_on_play_close(ctx);
+        printf("delete relay close %lx %lx\n",(unsigned long)ctx,(unsigned long)ctx->s);
+        ngx_http_live_relay_on_play_close((*stream)->relay_ctx);
         ctx->relay_ctx = NULL;
         (*stream)->relay_ctx = NULL;
     }
@@ -670,10 +676,10 @@ ngx_http_rtmp_live_close_play_stream(void* http_ctx)
     hr_ctx->stream->next = lacf->free_streams;
     lacf->free_streams = hr_ctx->stream;
     hr_ctx->stream = NULL;
+    printf("free http live stream\n");
 next:
     return NGX_OK;
 }
-
 
 static void * 
 ngx_http_rtmp_live_create_srv_conf(ngx_conf_t *cf)
@@ -739,13 +745,13 @@ ngx_http_rtmp_live_postconfiguration(ngx_conf_t *cf)
     ngx_rtmp_handler_pt                     *h;
     printf("ngx_http_rtmp_live_postconfiguration\n");
     cmcf = ngx_rtmp_conf_get_module_main_conf(cf, ngx_rtmp_core_module);
-    
+
     h = ngx_array_push(&cmcf->events[NGX_RTMP_MSG_VIDEO]);
     *h = ngx_http_rtmp_live_av;
-
+    
     h = ngx_array_push(&cmcf->events[NGX_RTMP_MSG_AUDIO]);
     *h = ngx_http_rtmp_live_av;
-
+    
     next_publish = ngx_rtmp_publish;
     ngx_rtmp_publish = ngx_http_rtmp_live_publish;
 
@@ -757,7 +763,6 @@ ngx_http_rtmp_live_postconfiguration(ngx_conf_t *cf)
 
     next_stream_eof = ngx_rtmp_stream_eof;
     ngx_rtmp_stream_eof = ngx_http_rtmp_live_stream_eof;
-
     return NGX_OK;
 }
 

@@ -226,6 +226,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
             if (st->in == NULL) {
                 ngx_log_error(NGX_LOG_INFO, c->log, 0,
                         "in buf alloc failed");
+                s->status_code = ngx_rtmp_handler_in_buf_alloc_err;
                 ngx_rtmp_finalize_session(s);
                 return;
             }
@@ -256,12 +257,14 @@ ngx_rtmp_recv(ngx_event_t *rev)
             n = c->recv(c, b->last, b->end - b->last);
 
             if (n == NGX_ERROR || n == 0) {
+                s->status_code = ngx_rtmp_handler_recv_data_err;
                 ngx_rtmp_finalize_session(s);
                 return;
             }
 
             if (n == NGX_AGAIN) {
                 if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
+                    s->status_code = ngx_rtmp_handler_recv_read_err;
                     ngx_rtmp_finalize_session(s);
                 }
                 return;
@@ -287,6 +290,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
                         "sending RTMP ACK(%uD)", s->in_bytes);
 
                 if (ngx_rtmp_send_ack(s, s->in_bytes)) {
+                    s->status_code = ngx_rtmp_handler_send_ack_err;
                     ngx_rtmp_finalize_session(s);
                     return;
                 }
@@ -326,6 +330,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
                 ngx_log_error(NGX_LOG_INFO, c->log, 0,
                     "RTMP in chunk stream too big: %D >= %D",
                     csid, cscf->max_streams);
+                s->status_code = ngx_rtmp_handler_in_chunk_too_big;
                 ngx_rtmp_finalize_session(s);
                 return;
             }
@@ -431,6 +436,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
             if (h->mlen > cscf->max_message) {
                 ngx_log_error(NGX_LOG_INFO, c->log, 0,
                         "too big message: %uz", cscf->max_message);
+                s->status_code = ngx_rtmp_handler_message_too_big;
                 ngx_rtmp_finalize_session(s);
                 return;
             }
@@ -462,6 +468,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
             h->timestamp += st->dtime;
 
             if (ngx_rtmp_receive_message(s, h, head) != NGX_OK) {
+                s->status_code = ngx_rtmp_handler_recv_data_err;
                 ngx_rtmp_finalize_session(s);
                 return;
             }
@@ -505,6 +512,7 @@ ngx_rtmp_send(ngx_event_t *wev)
         ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT,
                 "client timed out");
         c->timedout = 1;
+        s->status_code = ngx_rtmp_handler_send_timedout;
         ngx_rtmp_finalize_session(s);
         return;
     }
@@ -524,12 +532,14 @@ ngx_rtmp_send(ngx_event_t *wev)
         if (n == NGX_AGAIN || n == 0) {
             ngx_add_timer(c->write, s->timeout);
             if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
+                s->status_code = ngx_rtmp_handler_send_write_err;
                 ngx_rtmp_finalize_session(s);
             }
             return;
         }
 
         if (n < 0) {
+            s->status_code = ngx_rtmp_handler_send_write_err;
             ngx_rtmp_finalize_session(s);
             return;
         }
@@ -584,6 +594,7 @@ ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                 "RTMP out chunk stream too big: %D >= %D",
                 h->csid, cscf->max_streams);
        
+        s->status_code = ngx_rtmp_handler_out_chunk_too_big;
         ngx_rtmp_finalize_session(s);
         return;
     }

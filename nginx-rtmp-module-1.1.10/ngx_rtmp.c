@@ -862,3 +862,28 @@ ngx_rtmp_init_process(ngx_cycle_t *cycle)
 #endif
     return NGX_OK;
 }
+
+
+ngx_uint_t  
+ngx_rtmp_current_msec()
+{
+    ngx_uint_t  sec, msec;
+    sec = ngx_cached_time->sec;
+    msec = ngx_cached_time->msec;
+    
+    return sec*1000+msec;
+}
+
+/*
+static char 
+ngx_rtmp_http_status[ngx_rtmp_http_count][128] = {
+    {"NGX_PUSH_NORMAL_CLOSE"},
+    {"NGX_PUSH_HANDSHAKE_ERR"}
+    {"NGX_ERROR"}
+};
+char *
+ngx_rtmp_http_get_status(ngx_int_t code)
+{
+    return ngx_rtmp_http_status[code];
+}
+*/

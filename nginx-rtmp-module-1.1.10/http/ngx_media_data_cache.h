@@ -48,4 +48,6 @@ ngx_int_t ngx_media_data_cahce_clear(ngx_rtmp_session_t* s,ngx_int_t type);
 
 ngx_int_t ngx_http_flv_send_header(ngx_rtmp_session_t* s,void* pctx);
 
+//判断冷热流
+ngx_int_t ngx_rtmp_check_up_idle_stream(ngx_rtmp_session_t *s,int type);
 #endif
