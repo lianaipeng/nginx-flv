@@ -800,7 +800,7 @@ ngx_rtmp_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     static char *
 ngx_rtmp_core_error_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    //printf("ngx_rtmp_core_module ngx_rtmp_core_error_log conf:%p\n", conf);
+    printf("ngx_rtmp_core_module ngx_rtmp_core_error_log conf:%p\n", conf);
     /*
        ngx_rtmp_core_app_conf_t *cacf = conf;
        return ngx_log_set_log(cf, &cacf->error_log);
@@ -812,7 +812,7 @@ ngx_rtmp_core_error_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     static char *
 ngx_rtmp_core_rtmp_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    //printf("ngx_rtmp_core_module ngx_rtmp_core_rtmp_log conf:%p\n", conf);
+    printf("ngx_rtmp_core_module ngx_rtmp_core_rtmp_log conf:%p\n", conf);
     /*
     ngx_rtmp_core_srv_conf_t *cscf = conf;   
     return ngx_log_set_log(cf, &cscf->rtmp_log);
@@ -821,8 +821,11 @@ ngx_rtmp_core_rtmp_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_rtmp_core_srv_conf_t *cscf = conf;   
     char * tmp =  ngx_log_set_log(cf, &cscf->rtmp_log);
 
-    global_log = cscf->rtmp_log;
-    // printf("ngx_rtmp_core_module ngx_rtmp_core_rtmp_log rtmp_log:%p global_log:%p\n", cscf->rtmp_log, global_log);
+    if (cscf->rtmp_log != NULL) {
+        global_log = cscf->rtmp_log;
+    } else {
+        global_log = cscf->error_log;
+    } 
     
     return tmp;
 }

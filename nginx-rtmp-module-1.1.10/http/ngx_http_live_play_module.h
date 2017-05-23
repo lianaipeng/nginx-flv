@@ -123,13 +123,19 @@ typedef struct {
     ngx_str_t                        host;
     ngx_str_t                        pull_url;
     
-    ngx_uint_t                       video_size;
-    ngx_uint_t                       audio_size;
-    ngx_uint_t                       send_frame; 
+    ngx_uint_t                      stream_ts;
+    ngx_int_t                        delta;             //
+    ngx_uint_t                       recv_video_size;
+    ngx_uint_t                       recv_audio_size;
+    ngx_uint_t                       recv_video_frame; 
+    ngx_uint_t                       lrecv_video_size;
+    ngx_uint_t                       lrecv_audio_size;
+    ngx_uint_t                       lrecv_video_frame; 
     
     ngx_flag_t                       start_caton;    // 开始卡顿
     ngx_uint_t                       dropVideoFrame;
     ngx_uint_t                       cacheVideoFrame; 
+    ngx_int_t                        status_code; // 关闭时与request结构体同步
 } ngx_http_live_play_request_ctx_t;
 
 typedef struct {

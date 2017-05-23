@@ -8,6 +8,7 @@
 #include <ngx_core.h>
 #include "ngx_rtmp_cmd_module.h"
 #include "ngx_rtmp_streams.h"
+#include "ngx_rtmp_edge_log.h"
 
 
 #define NGX_RTMP_FMS_VERSION        "FMS/3,0,1,123"

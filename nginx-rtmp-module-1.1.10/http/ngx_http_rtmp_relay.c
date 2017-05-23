@@ -167,8 +167,9 @@ ngx_int_t ngx_http_rtmp_relay_pull(ngx_http_live_play_relay_ctx_t *relay_ctx,ngx
         ngx_rtmp_relay_target_t *target)
 {
     printf("ngx_http_rtmp_relay_pull\n");
-    return ngx_http_live_rtmp_relay_create(relay_ctx,name,target
-            ,ngx_http_live_rtmp_relay_create_remote_ctx,ngx_http_live_rtmp_relay_create_local_ctx);
+    return ngx_http_live_rtmp_relay_create(relay_ctx,name,target,
+            ngx_http_live_rtmp_relay_create_remote_ctx,
+            ngx_http_live_rtmp_relay_create_local_ctx);
 }
 
 ngx_int_t

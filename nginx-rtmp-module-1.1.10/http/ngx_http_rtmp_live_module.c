@@ -249,7 +249,8 @@ ngx_http_rtmp_live_play(void *http_ctx)
             return NGX_ERROR;
         }
     } else if (rc == NGX_OK && hr_ctx->stream ) {
-        hr_ctx->stream->relay_ctx = (void*)ctx->relay_ctx;
+        // hr_ctx->stream->relay_ctx = (void*)ctx->relay_ctx;
+        ctx->relay_ctx = hr_ctx->stream->relay_ctx;
         if (ctx->relay_ctx) {
             
             if (ctx->relay_ctx->rtmp_pull_url.len <= 0 && ctx->relay_ctx->http_pull_url.len <= 0) {
@@ -339,14 +340,6 @@ ngx_http_rtmp_live_update_audio_av_header(ngx_rtmp_session_t *s, ngx_rtmp_header
     return NGX_OK;
 }
 
-void
-ngx_http_rtmp_live_socket(struct sockaddr *sockaddr)
-{
-    struct sockaddr_in  *sin;
-    sin = (struct sockaddr_in *)sockaddr;
-    printf("ngx_http_rtmp_live_socket local_ip:%s time:%ld\n", inet_ntoa(sin->sin_addr), ngx_cached_time->msec);
-}
-
 
 // bool bIsFirst = true;
 FILE * fp = NULL;
@@ -354,13 +347,6 @@ int  frame_num = 0;
 static ngx_int_t 
 ngx_http_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, ngx_chain_t *in)
 {
-    /*
-    ngx_http_rtmp_live_socket(s->connection->sockaddr);
-    printf("asdasfasdfasdf\n");
-    ngx_http_rtmp_live_session();
-    ngx_http_rtmp_live_socket(s->connection->listening->sockaddr);
-    */
-
     ngx_http_rtmp_live_ctx_t       *ctx,*pctx;
     ngx_rtmp_codec_ctx_t           *codec_ctx;
     ngx_http_rtmp_live_app_conf_t       *lacf;
@@ -429,7 +415,7 @@ ngx_http_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, ngx_chain_t *
             if (codec_ctx->video_codec_id != NGX_RTMP_VIDEO_H264) {
                 return NGX_OK;
             }
-            mtype = HTTP_FLV_META_TAG;
+            mtype = HTTP_FLV_VIDEO_TAG;
             if (ngx_rtmp_get_video_frame_type(in) == 1)
                 mtype = HTTP_FLV_VIDEO_KEY_FRAME_TAG;
         } else if (h->type == NGX_RTMP_MSG_AUDIO) {
@@ -498,7 +484,7 @@ ngx_http_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, ngx_chain_t *
 
     // 获取当前时间 单位毫秒（打印日志使用）
     ngx_uint_t  current_ts = ngx_rtmp_current_msec();
-    
+    ngx_uint_t  peers = 0; 
     for (pctx = ctx->stream->ctx; pctx; pctx = pctx->next) {
         if (pctx == ctx) {
             continue;
@@ -523,7 +509,18 @@ ngx_http_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, ngx_chain_t *
            // printf(" ****** ngx_http_live_send_message\n");
             ngx_http_live_send_message(req_ctx,rpkt,mtype,mlen,h->timestamp,delta);
         }
+
+        peers++;
     }
+
+    
+    if (h->type == NGX_RTMP_MSG_AUDIO) {
+        s->send_audio_size += mlen * peers;
+    } else if (h->type == NGX_RTMP_MSG_VIDEO) {
+        s->send_video_size += mlen * peers;       
+        s->send_video_frame += peers;
+    }
+    
     ctx->stream->flv_header_update = 0;
 
     //判断如果冷流在一定时间内没有人观看，则把流断开，防止上行带宽过载浪费
@@ -666,7 +663,7 @@ ngx_http_rtmp_live_close_play_stream(void* http_ctx)
     //删除转推
     if(ctx->relay_ctx && ctx->relay_ctx == (*stream)->relay_ctx )
     {
-        printf("delete relay close %lx %lx\n",(unsigned long)ctx,(unsigned long)ctx->s);
+        printf("ngx_http_rtmp_live_close_play_stream delete relay close %lx %lx\n",(unsigned long)ctx,(unsigned long)ctx->s);
         ngx_http_live_relay_on_play_close((*stream)->relay_ctx);
         ctx->relay_ctx = NULL;
         (*stream)->relay_ctx = NULL;
@@ -676,7 +673,7 @@ ngx_http_rtmp_live_close_play_stream(void* http_ctx)
     hr_ctx->stream->next = lacf->free_streams;
     lacf->free_streams = hr_ctx->stream;
     hr_ctx->stream = NULL;
-    printf("free http live stream\n");
+    printf("ngx_http_rtmp_live_close_play_stream free http live stream\n");
 next:
     return NGX_OK;
 }

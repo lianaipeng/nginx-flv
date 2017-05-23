@@ -7,6 +7,7 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include "ngx_rtmp_netcall_module.h"
+#include "ngx_rtmp_edge_log.h"
 
 
 static ngx_int_t ngx_rtmp_netcall_postconfiguration(ngx_conf_t *cf);

@@ -2,6 +2,10 @@
 #include "ngx_http_live_play_module.h"
 #include "ngx_http_rtmp_relay.h"
 #include <ngx_md5.h>
+#include "ngx_rtmp_edge_log.h"
+
+char *
+ngx_http_live_get_str_data(ngx_str_t *str);
 
 static void * ngx_http_live_play_relay_create_loc_conf(ngx_conf_t * cf);
 static char * ngx_http_live_play_relay_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child);
@@ -291,9 +295,9 @@ ngx_http_live_netcall_close(ngx_connection_t *cc)
     }
 
     cc->destroyed = 1;
+    ctx = cs->ctx;
     //liw to do
     if (!cs->detached) {
-        ctx = cs->ctx;
         if (cs->in && cs->sink) {
             cs->sink(ctx, cs->in);
 
@@ -306,20 +310,19 @@ ngx_http_live_netcall_close(ngx_connection_t *cc)
         }
     }
     
-    
     // global_log
     ngx_uint_t  current_ts = ngx_rtmp_current_msec();
-    char *szformat = NULL;
-    //判断是否还能处理数据
-    szformat = "{_type:v2.edgeBackSource,timestamp:%l,statusCode:%l,rtmp_pull_url:%s,http_pull_url:%s,duration:%l}";
-    ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, cs->status_code, &ctx->rtmp_pull_url, &ctx->http_pull_url, current_ts-cs->netcall_ts);
-
+    if (ctx != NULL) {
+        ngx_rtmp_edge_log(NGX_EDGE_HTTP, NGX_EDGE_BACK_SOURCE, cs, current_ts);
+    }
+    
     pool = cc->pool;
     ngx_close_connection(cc);
     ngx_destroy_pool(pool);
     
     printf("ngx_http_live_netcall_close\n");
 }
+
 
 static void ngx_http_live_netcall_recv(ngx_event_t *rev)
 {
@@ -396,7 +399,12 @@ static void ngx_http_live_netcall_recv(ngx_event_t *rev)
         n = cc->recv(cc, b->last, b->end - b->last);
 
         if (n == NGX_ERROR || n == 0) {
-            cs->status_code = ngx_http_relay_recv_data_err;
+            if (n == 0 ){
+                cs->status_code = ngx_normal_close;
+            } else {
+                cs->status_code = ngx_http_relay_recv_data_err;
+            }
+            
             ngx_http_live_netcall_close(cc);
             return;
         }

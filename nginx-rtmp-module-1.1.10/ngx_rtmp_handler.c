@@ -8,6 +8,7 @@
 #include <ngx_core.h>
 #include "ngx_rtmp.h"
 #include "ngx_rtmp_amf.h"
+#include "ngx_rtmp_edge_log.h"
 
 
 static void ngx_rtmp_recv(ngx_event_t *rev);
@@ -257,7 +258,13 @@ ngx_rtmp_recv(ngx_event_t *rev)
             n = c->recv(c, b->last, b->end - b->last);
 
             if (n == NGX_ERROR || n == 0) {
-                s->status_code = ngx_rtmp_handler_recv_data_err;
+                if (n == 0 ){
+                    s->status_code = ngx_normal_close;
+                } else {
+                    // cs->status_code = ngx_http_relay_recv_data_err;
+                    // cs->status_code = ngx_rtmp_handshake_recv_data_err;
+                    s->status_code = ngx_rtmp_handler_recv_data_err;
+                }
                 ngx_rtmp_finalize_session(s);
                 return;
             }

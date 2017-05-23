@@ -297,10 +297,13 @@ ngx_http_flv_media_data_cache_write(ngx_rtmp_session_t* s, ngx_rtmp_header_t *h,
 
                 ngx_media_data_node_t * ln = ctx->media_cache->busy_cache_head;
                 ctx->media_cache->busy_cache_head = ln->next;
-
-                printf("http flv delete video frame num %ld  audio frame num %ld ,gop num %ld\n"
+                
+                /*
+                 printf("http flv delete video frame num %ld  audio frame num %ld ,gop num %ld\n"
                         ,ctx->media_cache->video_cache_frame_num,ctx->media_cache->audio_cache_frame_num
                         ,ctx->media_cache->cache_gop_num);
+                        */
+
                 int vide_delframe = 0;
                 while (ln) {
                     //printf("delete frame  %ld\n",ln->mtype);
@@ -333,10 +336,12 @@ ngx_http_flv_media_data_cache_write(ngx_rtmp_session_t* s, ngx_rtmp_header_t *h,
 
                     ctx->media_cache->busy_cache_head = ln->next;
                 }
-
-                printf("http flv video frame num %ld  audio frame num %ld ,gop num %ld del video frame %d\n"
+                    
+                /*
+                 printf("http flv video frame num %ld  audio frame num %ld ,gop num %ld del video frame %d\n"
                         ,ctx->media_cache->video_cache_frame_num,ctx->media_cache->audio_cache_frame_num
                         ,ctx->media_cache->cache_gop_num,vide_delframe);
+                        */
             }
         }
     }
@@ -761,9 +766,12 @@ ngx_int_t ngx_rtmp_check_up_idle_stream(ngx_rtmp_session_t *s,int type)
                 {
                     if(type == HTTP_FLV_PROTOCOL)
                     {
-                        if((s->current_time - s->busy_time) > cscf->idle_up_stream_destory)
-                        {
-                            return NGX_ERROR;
+                        // printf("ngx_rtmp_check_up_idle_stream current_time-busy_time:%d idle_up_stream_destory:%ld\n", (s->current_time - s->busy_time), cscf->idle_up_stream_destory);
+                        if (s->current_time > s->busy_time) {
+                            if((s->current_time - s->busy_time) > cscf->idle_up_stream_destory)
+                            {
+                                return NGX_ERROR;
+                            }
                         }
                     }
                 }

@@ -2,6 +2,7 @@
 #include "ngx_http_rtmp_live_module.h"
 #include "ngx_rtmp_to_flv_packet.h"
 #include "ngx_http_play_scheduler.h"
+#include "ngx_rtmp_edge_log.h"
 
 static char * ngx_http_live_play_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child);
 static void * ngx_http_live_play_create_srv_conf(ngx_conf_t * cf);
@@ -407,14 +408,17 @@ ngx_http_live_play_close_request(ngx_http_request_t * r)
     if (pr->send_header_timeout_ev.timer_set) {
         ngx_del_timer(&pr->send_header_timeout_ev);
     }
+
+    if (pr->idle_evt.timer_set) {
+        ngx_del_timer(&pr->idle_evt);
+    }
     
+
     pr->current_ts = ngx_rtmp_live_current_msec();
-    // 获取日志唯一id
-    char *szformat = NULL;
-    szformat = "{_type:v2.edgePullStop,timestamp:%l,session:%s,clientIP:%V,serverIP:%V,host:%V,name:%V,protocolType:http-flv,pullUrl:%V,duration:%l,statusCode:%l,videoSize:%l,audioSize:%l,allDropFrame:%l}";
-    ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, pr->current_ts, pr->uuid, &pr->client_ip, &pr->server_ip, &pr->host, &pr->stream, &pr->pull_url, pr->current_ts-pr->request_ts, r->status_code, pr->video_size, pr->audio_size, pr->dropVideoFrame);
+    pr->status_code = r->status_code;
+    ngx_rtmp_edge_log(NGX_EDGE_HTTP, NGX_EDGE_PULL_STOP, pr, pr->current_ts);
     
-    // printf("ngx_http_live_play_close_request %lx %lx %lx\n",(unsigned long)hctx,(unsigned long)hctx->s,(unsigned long)r);
+
     //删除
     ngx_http_rtmp_live_close_play_stream((void*)pr);
     
@@ -510,6 +514,7 @@ ngx_http_live_play_recv_handler(ngx_event_t *ev)
         if (n == NGX_ERROR || n == 0) {
             ev->error = 1;
             printf("close in read +++++++++++1\n");
+            
             break;
         }
 
@@ -527,7 +532,12 @@ ngx_http_live_play_recv_handler(ngx_event_t *ev)
     }
     printf("close http request %lx\n",(unsigned long)c->data);
     ngx_http_request_t *  r = (ngx_http_request_t * )c->data;
-    r->status_code = ngx_http_live_recv_handler_err; 
+
+    if (n == 0){
+        r->status_code = ngx_normal_close; 
+    } else {
+        r->status_code = ngx_http_live_recv_handler_err; 
+    }
     ngx_http_live_play_close_request(r);
 }
 
@@ -540,7 +550,6 @@ ngx_http_live_play_write_handler(ngx_event_t *ev)
      ngx_http_live_play_loc_conf_t* hlplc = NULL;
     hlplc = (ngx_http_live_play_loc_conf_t*)ngx_http_get_module_loc_conf(r, ngx_http_live_play_module);
     ngx_int_t                   n;
-    printf("ngx_http_live_play_write_handler global_log:%p\n", global_log);
     if (c->destroyed){
         ev->error = 1;
         return;
@@ -732,26 +741,23 @@ ngx_http_live_play_init_log(ngx_http_live_play_request_ctx_t *pr)
     if (getsockname(r->connection->fd, (struct sockaddr *)&sa, (socklen_t *)&len) != 0) {
         return;
     }
-    char *local_ip = inet_ntoa(sa.sin_addr);
-
+    char *server_ip = inet_ntoa(sa.sin_addr);
+    pr->server_ip.len = ngx_strlen(server_ip);
+    pr->server_ip.data = ngx_pcalloc(r->connection->pool, pr->server_ip.len+1);
+    ngx_memzero(pr->server_ip.data, pr->server_ip.len+1);
+    ngx_memcpy(pr->server_ip.data, server_ip, pr->server_ip.len);
+    
+    
     if (getpeername(r->connection->fd, (struct sockaddr *)&sa, (socklen_t *)&len) != 0) {
         return;
     }
     char *peer_ip = inet_ntoa(sa.sin_addr);
-    printf("ngx_rtmp_init ngx_rtmp_init_socket local_ip:%s peer_ip:%s\n", local_ip, peer_ip);
-
-    pr->server_ip.len = ngx_strlen(peer_ip);
-    pr->server_ip.data = ngx_pcalloc(r->connection->pool, pr->server_ip.len+1);
-    ngx_memzero(pr->server_ip.data, pr->server_ip.len+1);
-    ngx_memcpy(pr->server_ip.data, peer_ip, pr->server_ip.len);
-    
     pr->client_ip.len = ngx_strlen(peer_ip);
     pr->client_ip.data = ngx_pcalloc(r->connection->pool, pr->client_ip.len+1);
     ngx_memzero(pr->client_ip.data, pr->client_ip.len+1);
     ngx_memcpy(pr->client_ip.data, peer_ip, pr->client_ip.len);
     
     // 获取host 
-    // ngx_log_error(NGX_LOG_ERR, global_log, 0, "WOCAOCAO key:%s value:%s\n",r->headers_in.host->key.data, r->headers_in.host->value.data);
     pr->host.len = r->headers_in.host->value.len;
     pr->host.data = r->headers_in.host->value.data;
     
@@ -989,9 +995,6 @@ ngx_http_live_send_message(ngx_http_live_play_request_ctx_t *pr, ngx_chain_t* ou
     }
 
     // 打印日志
-    // ngx_http_request_t  *r = pr->s;
-    char *szformat = NULL;
-
     //判断是否还能处理数据
     if(ngx_http_paly_cache_process(pr, mtype) !=  NGX_OK) {
         printf("dorp frame  %c  len %d pts %d\n",mtype,mlen,pts);
@@ -1005,8 +1008,7 @@ ngx_http_live_send_message(ngx_http_live_play_request_ctx_t *pr, ngx_chain_t* ou
         }
 
         if (pr->start_caton == 0) {
-            szformat = "{_type:v2.edgeBufferStart,timestamp:%l,session:%s,clientIP:%V,serverIP:%V,host:%V,name:%V,protocolType:http-flv,cacheVideoFrame:%l,cacheDuration:%l}";
-            ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, pr->current_ts, pr->uuid, &pr->client_ip, &pr->server_ip, &pr->host, &pr->stream, pr->drop_vframe_num, pr->drop_vduration);
+            ngx_rtmp_edge_log(NGX_EDGE_HTTP, NGX_EDGE_BUFFER_START, pr, pr->current_ts);
         }
 
         return NGX_ERROR;
@@ -1015,12 +1017,9 @@ ngx_http_live_send_message(ngx_http_live_play_request_ctx_t *pr, ngx_chain_t* ou
             pr->cache_frame_num++;
             pr->cache_time_duration += delta;
         }
-        printf("current cahce have frame %ld, duration %ld %ld %ld\n",pr->cache_frame_num,pr->cache_time_duration,
-        lacf->http_play_cahce_frame_num,lacf->http_play_cahce_time_duration);
         
         if (pr->start_caton == 1) {
-            szformat = "{_type:v2.edgeBufferStop,timestamp:%l,session:%s,clientIP:%V,serverIP:%V,host:%V,name:%V,protocolType:http-flv,dropVideoSize:%l,dorpAudioSize:%l,dropVideoFrame:%l,duration:%l}";
-            ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, pr->current_ts, pr->uuid, &pr->client_ip, &pr->server_ip, &pr->host, &pr->stream, pr->drop_video_size, pr->drop_audio_size, pr->drop_vframe_num, pr->drop_vduration);
+            ngx_rtmp_edge_log(NGX_EDGE_HTTP, NGX_EDGE_BUFFER_STOP, pr, pr->current_ts);
             
             pr->drop_vduration = 0;
             pr->drop_vframe_num = 0;
@@ -1051,27 +1050,32 @@ ngx_http_live_send_message(ngx_http_live_play_request_ctx_t *pr, ngx_chain_t* ou
 
     if (!pr->s->connection->write->active) {
         ngx_http_live_play_write_handler(pr->s->connection->write);
-        printf("ngx_http_live_send_message  send data to net ----\n");
+        // printf("ngx_http_live_send_message  send data to net ----\n");
         /*return ngx_add_event(r->connection->write, NGX_WRITE_EVENT, NGX_CLEAR_EVENT);*/
     }
     
-    if (pr->log_type == 0) { 
-        szformat = "{_type:v2.edgePullStart,timestamp:%l,session:%s,clientIP:%V,serverIP:%V,host:%V,name:%V,protocolType:http-flv,responseTime:%l,pullUrl:%V}";
-        ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, pr->current_ts, pr->uuid, &pr->client_ip, &pr->server_ip, &pr->host, &pr->stream, pr->current_ts-pr->request_ts, &pr->pull_url);
-        pr->log_type = 1;
-    } else {
-        if (mtype == HTTP_FLV_VIDEO_TAG) {
-            pr->video_size += mlen;
-        } else if (mtype == HTTP_FLV_AUDIO_TAG) {
-            pr->audio_size += mlen;
+    // 日志相关 
+    if (mtype == HTTP_FLV_VIDEO_TAG) {
+        pr->recv_video_size += mlen;
+    } else if (mtype == HTTP_FLV_AUDIO_TAG) {
+        pr->recv_audio_size += mlen;
+    }
+    pr->recv_video_frame += 1;
+
+    if ( (pr->current_ts-pr->log_lts) >= NGX_RTMP_BANDWIDTH_INTERVAL*1000) {
+        if (pr->log_type == 0) { 
+            ngx_rtmp_edge_log(NGX_EDGE_HTTP, NGX_EDGE_PULL_START, pr, pr->current_ts);
+            pr->log_type = 1;
+        } else {
+            pr->stream_ts = pts;
+            pr->delta = delta;
+            ngx_rtmp_edge_log(NGX_EDGE_HTTP, NGX_EDGE_PULL_WATCH, pr, pr->current_ts);
+
+            pr->lrecv_video_size = pr->recv_video_size;
+            pr->lrecv_audio_size = pr->recv_audio_size;
+            pr->lrecv_video_frame = pr->recv_video_frame;
         }
-        pr->send_frame += 1;
-         
-        if ( (pr->current_ts-pr->log_lts) >= NGX_RTMP_BANDWIDTH_INTERVAL*1000) {
-            szformat = "{_type:v2.edgePullWatch,timestamp:%l,session:%s,clientIP:%V,serverIP:%V,host:%V,name:%V,protocolType:http-flv,pullUrl:%V,pts:%l,videoSize:%l,audioSize:%l,delay:%l,sendFrame:%l,dropVideoFrame:%l,cacheVideoFrame:%l}";
-            ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, pr->current_ts, pr->uuid, &pr->client_ip, &pr->server_ip, &pr->host, &pr->stream, &pr->pull_url, pts, pr->video_size, pr->audio_size, delta, pr->send_frame, pr->dropVideoFrame, pr->cacheVideoFrame);
-            pr->log_lts = pr->current_ts;
-        }
+        pr->log_lts = pr->current_ts;
     }
     return NGX_OK;
 }

@@ -8,6 +8,7 @@
 #include <ngx_core.h>
 #include "ngx_rtmp.h"
 #include "ngx_rtmp_proxy_protocol.h"
+#include "ngx_rtmp_edge_log.h"
 
 
 static void ngx_rtmp_close_connection(ngx_connection_t *c);
@@ -139,50 +140,52 @@ ngx_rtmp_init_connection(ngx_connection_t *c)
     }
 }
 
-static void 
+void 
 ngx_rtmp_init_socket(ngx_rtmp_session_t *s)
 {
     ngx_uint_t  current_ts = ngx_rtmp_current_msec();
     // u_char uuid[32] = {'\0'};
     ngx_memzero(s->uuid, 32);
     ngx_sprintf(s->uuid, "%l_%d", current_ts, s->connection->fd);
-    // printf("$$$$$$$$$$$$$$ %s\n", s->uuid);
     
     // 获取client server ip
     struct sockaddr_in sa;
     int len = sizeof(sa);
-
+        
     if (getsockname(s->connection->fd, (struct sockaddr *)&sa, (socklen_t *)&len) != 0) {
         return;
     }
     char *local_ip = inet_ntoa(sa.sin_addr);
+    s->server_ip.len = ngx_strlen(local_ip);
+    s->server_ip.data = ngx_pcalloc(s->connection->pool, s->server_ip.len+1);
+    ngx_memzero(s->server_ip.data, s->server_ip.len+1);
+    ngx_memcpy(s->server_ip.data, local_ip, s->server_ip.len);
 
+    len = sizeof(sa); 
     if (getpeername(s->connection->fd, (struct sockaddr *)&sa, (socklen_t *)&len) != 0) {
         return;
     }
     char *peer_ip = inet_ntoa(sa.sin_addr);
-    printf("ngx_rtmp_init ngx_rtmp_init_socket local_ip:%s peer_ip:%s\n", local_ip, peer_ip);
-
-    s->server_ip.len = ngx_strlen(peer_ip);
-    s->server_ip.data = ngx_pcalloc(s->connection->pool, s->server_ip.len+1);
-    ngx_memzero(s->server_ip.data, s->server_ip.len+1);
-    ngx_memcpy(s->server_ip.data, peer_ip, s->server_ip.len);
-    
     s->client_ip.len = ngx_strlen(peer_ip);
     s->client_ip.data = ngx_pcalloc(s->connection->pool, s->client_ip.len+1);
     ngx_memzero(s->client_ip.data, s->client_ip.len+1);
     ngx_memcpy(s->client_ip.data, peer_ip, s->client_ip.len);
     
-    // host
-    // printf("############## %ld %s\n", s->addr_text->len, s->addr_text->data);
-    s->host.len = s->addr_text->len;
-    s->host.data = s->addr_text->data;
+    char host[1024] = {'\0'};
+    ngx_memcpy(host, s->connection->addr_text.data, s->connection->addr_text.len);
+    len = 0;
+    while (host[len] != '/' && host[len] != '\0') {
+        len++;
+    }
+    s->host.len = len;
+    s->host.data = ngx_pcalloc(s->connection->pool, len+1);
+    ngx_memzero(s->host.data, len+1);
+    ngx_memcpy(s->host.data, host, len);
 }
 
 ngx_rtmp_session_t *
 ngx_rtmp_init_session(ngx_connection_t *c, ngx_rtmp_addr_conf_t *addr_conf)
 {
-    printf("ngx_rtmp_init ngx_rtmp_init_session\n");
 
     ngx_rtmp_session_t             *s;
     ngx_rtmp_core_srv_conf_t       *cscf;
@@ -244,6 +247,9 @@ ngx_rtmp_init_session(ngx_connection_t *c, ngx_rtmp_addr_conf_t *addr_conf)
     ngx_set_connection_log(s->connection, cscf->error_log);
     ngx_set_connection_rtmplog(s->connection, cscf->rtmp_log);
     ngx_rtmp_init_socket(s);
+
+    if (global_log == NULL)
+        global_log = cscf->error_log; 
     
     s->out_queue = cscf->out_queue;
     s->out_cork = cscf->out_cork;
@@ -379,21 +385,14 @@ ngx_rtmp_finalize_session(ngx_rtmp_session_t *s)
         return;
     }
 
-    char *szformat = NULL;
-    
+    // char *szformat = NULL;
     ngx_uint_t  current_ts = ngx_rtmp_current_msec();
     if (s->publishing == 1) {
-        // szformat = "{_type:v2.edgePushStop,timestamp:%l,ses:%s,clientIP:%V,serverIP:%V,host:%V,name:%s,protocolType:rtmp,recvVideoSize:%l,recvAudioSize:%l,recvVideoFrame:%l,sendVideoSize:%l,sendAudioSize:%l}";
-        szformat = "{_type:v2.edgePushStop,timestamp:%l,session:%s,clientIP:%V,serverIP:%V,host:%V,name:%V,protocolType:rtmp,statusCode:%l,recvVideoSize:%l,recvAudioSize:%l,recvVideoFrame:%l,sendVideoSize:%l,sendAudioSize:%l}";
-        // ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, ses, &ctx->client_ip, &ctx->server_ip, &ctx->host, ctx->stream->name, ctx->stream->bw_in_video, ctx->stream->bw_in_audio, 0, 0, 0);
-        ngx_log_error(NGX_LOG_INFO, c->rtmp_log, 0, szformat, current_ts, s->uuid, &s->client_ip, &s->server_ip, &s->host, &s->name, s->status_code, s->recv_video_size, s->recv_audio_size, s->recv_video_frame, s->send_video_size, s->send_audio_size);
+        ngx_rtmp_edge_log(NGX_EDGE_RTMP, NGX_EDGE_PUSH_STOP, s, current_ts);
     } else {
-        szformat = "{_type:v2.edgePullStop,timestamp:%l,session:%s,clientIP:%V,serverIP:%V,host:%V,name:%V,protocolType:rtmp,pullUrl:%V,duration:%l,statusCode:%l,videoSize:%l,audioSize:%l,allDropFrame:%l}";
-        ngx_log_error(NGX_LOG_INFO, c->rtmp_log, 0, szformat, current_ts, s->uuid,&s->client_ip, &s->server_ip, &s->host, &s->name, &s->pull_url, 0, s->status_code, s->recv_video_size, s->recv_audio_size, 0);
+        ngx_rtmp_edge_log(NGX_EDGE_RTMP, NGX_EDGE_PULL_STOP, s, current_ts);
     }
     
-    // ngx_log_debug0(NGX_LOG_DEBUG_RTMP, c->log, 0, "finalize session");
-
     c->destroyed = 1;
     e = &s->close;
     e->data = s;

@@ -9,6 +9,7 @@
 #include "ngx_rtmp_relay_module.h"
 #include "ngx_rtmp_cmd_module.h"
 #include "ngx_rtmp_live_module.h"
+#include "ngx_rtmp_edge_log.h"
 
 static ngx_rtmp_publish_pt          next_publish;
 static ngx_rtmp_play_pt             next_play;
@@ -477,8 +478,6 @@ ngx_rtmp_relay_create_connection(ngx_rtmp_conf_ctx_t *cctx, ngx_str_t* name,
     addr_ctx->srv_conf  = cctx->srv_conf;
     ngx_str_set(&addr_conf->addr_text, "ngx-relay");
 
-    printf("ngx_rtmp_relay_create_connection ngx_rtmp_init_session\n");
-    
     rs = ngx_rtmp_init_session(c, addr_conf);
     if (rs == NULL) {
         /* no need to destroy pool */
@@ -565,8 +564,6 @@ ngx_rtmp_relay_create(ngx_rtmp_session_t *s, ngx_str_t *name,
     ngx_rtmp_relay_app_conf_t      *racf;
     ngx_rtmp_relay_ctx_t           *publish_ctx, *play_ctx, **cctx;
     ngx_uint_t                      hash;
-
-    printf("ngx_rtmp_relay_create\n");
 
     racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_relay_module);
     if (racf == NULL) {
@@ -992,6 +989,8 @@ ngx_rtmp_relay_send_publish(ngx_rtmp_session_t *s)
     ngx_rtmp_header_t           h;
     ngx_rtmp_relay_ctx_t       *ctx;
 
+    s->publishing = 0;
+    s->log_type = 0;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_relay_module);
     if (ctx == NULL) {
@@ -1059,6 +1058,9 @@ ngx_rtmp_relay_send_play(ngx_rtmp_session_t *s)
     if (racf == NULL || ctx == NULL) {
         return NGX_ERROR;
     }
+
+    s->publishing = 1;
+    s->log_type = 0;
 
     if (ctx->play_path.len) {
         out_elts[3].data = ctx->play_path.data;
@@ -1318,7 +1320,26 @@ ngx_rtmp_relay_handshake_done(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     if (ctx == NULL || !s->relay) {
         return NGX_OK;
     }
+    
+    ngx_rtmp_init_socket(s);
+    
+    s->name.len = ctx->name.len; 
+    s->name.data = ngx_pcalloc(s->connection->pool, ctx->name.len+1);
+    ngx_memzero(s->name.data, s->name.len+1);
+    ngx_memcpy(s->name.data, ctx->name.data, s->name.len);
 
+    s->pull_url.len = 7 + ctx->url.len;
+    s->pull_url.data = ngx_pcalloc(s->connection->pool, s->pull_url.len+1);
+    ngx_memzero(s->pull_url.data , s->pull_url.len+1);
+    s->pull_url.data[0] = 'r';
+    s->pull_url.data[1] = 't';
+    s->pull_url.data[2] = 'm';
+    s->pull_url.data[3] = 'p';
+    s->pull_url.data[4] = ':';
+    s->pull_url.data[5] = '/';
+    s->pull_url.data[6] = '/';
+    ngx_memcpy(s->pull_url.data + 7, ctx->url.data, ctx->url.len);   
+    
     return ngx_rtmp_relay_send_connect(s);
 }
 
