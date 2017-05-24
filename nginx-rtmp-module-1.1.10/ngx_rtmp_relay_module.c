@@ -723,7 +723,6 @@ ngx_rtmp_relay_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
     }
     if(ngx_rtmp_live_find_stream(lacf,v->name) == NGX_OK)
     {
-        printf("stream now is exist\n");
         goto next;
     }
 

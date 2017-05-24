@@ -38,7 +38,6 @@ int ngx_flv_right_bigger(int left,int right)
 {
 	if(left < right)
 	{
-		printf("flv:dst size is smaller\n");
 		return 1;
 	}
 	return 0;

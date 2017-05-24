@@ -350,8 +350,6 @@ ngx_rtmp_handshake_create_response(ngx_rtmp_session_t *s)
 static void
 ngx_rtmp_handshake_done(ngx_rtmp_session_t *s)
 {
-    printf("ngx_rtmp_handshake ngx_rtmp_handshake_done\n");
-
     ngx_rtmp_free_handshake_buffers(s);
 
     ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,

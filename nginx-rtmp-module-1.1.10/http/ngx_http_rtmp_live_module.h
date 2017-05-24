@@ -54,8 +54,11 @@ struct ngx_http_rtmp_live_stream_s {
     unsigned int                       tag_buf_len;
     unsigned int                       avc_tag_size;
     ngx_chain_t*                       avc_conf_tag;
+    unsigned int                       avc_tag_pts;
+
     unsigned int                       aac_tag_size;
     ngx_chain_t*                       aac_conf_tag;
+    unsigned int                       aac_tag_pts;
     unsigned int                       meta_tag_size;
     ngx_chain_t*                       meta_conf_tag; 
     u_char                             flv_header_update;

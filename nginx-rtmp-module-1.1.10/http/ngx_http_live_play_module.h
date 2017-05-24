@@ -123,7 +123,7 @@ typedef struct {
     ngx_str_t                        host;
     ngx_str_t                        pull_url;
     
-    ngx_uint_t                      stream_ts;
+    ngx_uint_t                       stream_ts;
     ngx_int_t                        delta;             //
     ngx_uint_t                       recv_video_size;
     ngx_uint_t                       recv_audio_size;

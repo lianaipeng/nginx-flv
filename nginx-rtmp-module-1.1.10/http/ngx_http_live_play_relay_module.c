@@ -319,8 +319,7 @@ ngx_http_live_netcall_close(ngx_connection_t *cc)
     pool = cc->pool;
     ngx_close_connection(cc);
     ngx_destroy_pool(pool);
-    
-    printf("ngx_http_live_netcall_close\n");
+     ngx_printf_log("ngx_http_live_play_relay_module","ngx_http_live_netcall_close","close");
 }
 
 
@@ -489,7 +488,6 @@ ngx_int_t ngx_http_live_md5(char * v,char *id,long ltime,char*random,char* szkey
     char szmd5[4096]= {0};
     unsigned char md5_output[32];
     sprintf(szmd5,"%s.%s.%ld.%s",random,szkey,ltime,id);	
-    printf("md5 : %s\n",szmd5);
     MD5((unsigned char *)szmd5,strlen(szmd5),md5_output);
     int  mn = 0;
     char * pstr = v;
@@ -539,8 +537,7 @@ ngx_int_t ngx_http_live_netclall_param(ngx_http_live_play_request_ctx_t * rc,cha
     ngx_escape_uri((u_char*)szkey,hrlc->secret_key.data,hrlc->secret_key.len,NGX_ESCAPE_ARGS);
     ngx_http_live_md5(szsig,szid,ltime,szrandom,szkey);
     sprintf(args,"secretid=%s&time=%ld&random=%s&sign=%s&streamid=%s",szid,ltime,szrandom,szsig,stream);
-    //printf("netcall param :%s\n",args);
-
+    ngx_printf_log("ngx_http_live_play_relay_module","ngx_http_live_netclall_param","args:%s",args);
     return NGX_OK;
 }
 
@@ -654,10 +651,8 @@ static ngx_chain_t *ngx_http_live_notify_play_create(ngx_http_request_t *s, void
         return NULL;
     }
     char * v = (char*)arg;
-    printf("args:%s\n",v);
     args_len = strlen(v);
-    printf("args_len:%ld  args:%s\n",args_len,v);
-
+    ngx_printf_log("ngx_http_live_play_relay_module","ngx_http_live_notify_play_create","args:%s",v);
     b = ngx_create_temp_buf(pool,NGX_INT32_LEN * 3 + 1 + args_len);
     if (b == NULL) {
         return NULL;
@@ -670,7 +665,6 @@ static ngx_chain_t *ngx_http_live_notify_play_create(ngx_http_request_t *s, void
         b->last = (u_char *) ngx_cpymem(b->last, (u_char*)v, args_len);
         char args[2048] = {'\0'};
         strncpy(args,(char*)b->pos,args_len);
-        printf("args:%s\n",args);
     }
     return ngx_http_live_notify_create_request(s, pool, pl);
 } 
@@ -755,11 +749,6 @@ ngx_chain_t * ngx_http_live_netcall_http_skip_header(ngx_chain_t *in)
 static ngx_int_t 
 ngx_http_live_notify_parse_http_message(ngx_http_live_play_relay_ctx_t *hrctx,ngx_chain_t *in)
 {
-    //char * server = "Server";
-    //char * date = "Date";
-    //char * content_type = "Connect-Type";
-    //char * content_len = "Connect-Lenght";
-//    char *data  = strstr(message,header_flag);
     char data[4096] = {'\0'};
     in = ngx_http_live_netcall_http_skip_header(in);
     if (in) {
@@ -769,6 +758,9 @@ ngx_http_live_notify_parse_http_message(ngx_http_live_play_relay_ctx_t *hrctx,ng
         {
             char* p = (char*)in->buf->pos;
             int l = in->buf->last - in->buf->pos;
+            if(len + l > 4096)
+                return NGX_ERROR;
+
             memcpy(ptr,p,l);
             ptr += l;
             len += l;
@@ -787,7 +779,6 @@ ngx_http_live_notify_parse_http_message(ngx_http_live_play_relay_ctx_t *hrctx,ng
         {
 
             ptr1 += le;
-            //printf("rtmp_pull_ptr : %s\n",ptr1);
             pt = hrctx->rtmp_pull_url.data;
             if(*ptr1 == '\"' && pt)
             {
@@ -803,7 +794,7 @@ ngx_http_live_notify_parse_http_message(ngx_http_live_play_relay_ctx_t *hrctx,ng
                 }
                 hrctx->rtmp_pull_url.len = i;
                 ngx_str_format_string(hrctx->rtmp_pull_url,rtmp);
-                printf("rtmp_pull_url:%s\n",rtmp);           
+                ngx_printf_log("ngx_http_live_play_relay_module","ngx_http_live_notify_parse_http_message","url :%s",rtmp);         
             }
         }
 
@@ -813,7 +804,6 @@ ngx_http_live_notify_parse_http_message(ngx_http_live_play_relay_ctx_t *hrctx,ng
 
         ptr2 += le;
         pt = hrctx->http_pull_url.data;
-        //printf("http_pull_ptr : %s\n",ptr2);
         if(*ptr2 == '\"' && pt)
         {
             ptr2++;
@@ -829,12 +819,12 @@ ngx_http_live_notify_parse_http_message(ngx_http_live_play_relay_ctx_t *hrctx,ng
             hrctx->http_pull_url.len = i;
             
             ngx_str_format_string(hrctx->http_pull_url,http);
-            printf("http_pull_url: %s\n",http);
+            ngx_printf_log("ngx_http_live_play_relay_module","ngx_http_live_notify_parse_http_message","url :%s",http);
         }
     }
     else
     {
-        printf("data:error\n");
+        ngx_printf_log("ngx_http_live_play_relay_module","ngx_http_live_notify_parse_http_message","data:error");
     }
     return NGX_OK;
 }
@@ -843,10 +833,7 @@ static ngx_int_t ngx_http_live_notify_play_handle(ngx_http_live_play_relay_ctx_t
 {
 
     ngx_int_t rc;
-    //ngx_http_live_play_request_ctx_t *  hctx = (ngx_http_live_play_request_ctx_t*)ngx_http_get_module_ctx(s,ngx_http_live_play_module);
-    //printf("ngx_http_live_notify_play_handle  %lx %lx %lx %lx\n"
-    //,(unsigned long)hctx,(unsigned long )hctx->s,(unsigned long)s,(unsigned long)hrctx);
-
+    ngx_printf_log("ngx_http_live_play_relay_module","ngx_http_live_notify_play_handle","begin");
     if(hrctx == NULL)
         return NGX_ERROR;
     // 删除定时器 
@@ -858,7 +845,7 @@ static ngx_int_t ngx_http_live_notify_play_handle(ngx_http_live_play_relay_ctx_t
     hrctx->backing = 0;
 
     //free
-    char *message = (char*)malloc(1024 * 64);
+    /*char *message = (char*)malloc(1024 * 64);
     int len = 0;
     char * ptr = message;
     ngx_chain_t* cn = in;
@@ -873,22 +860,21 @@ static ngx_int_t ngx_http_live_notify_play_handle(ngx_http_live_play_relay_ctx_t
     }
     ptr[len+1] = '\0';
     printf("message len %d  body: %s \n",len,message);
+    */
 
     rc = ngx_http_live_notify_parse_http_retcode(in);
     if (rc != NGX_OK) {
         hrctx->errcount++;
-        printf("message retcode:%ld\n",rc);
+        ngx_printf_log("ngx_http_live_play_relay_module","ngx_http_live_notify_play_handle","code error %ld",rc);
         return NGX_ERROR;
     }
-
-    printf("message retcode:%ld 200 OK\n",rc);
 
     ngx_http_live_notify_parse_http_message(hrctx,in);
     
     if(hrctx->rtmp_pull_url.len < strlen("rtmp:\\"))
     {
         hrctx->errcount++;
-        printf("rtmp_pull_len is %ld\n",hrctx->rtmp_pull_url.len);
+        ngx_printf_log("ngx_http_live_play_relay_module","ngx_http_live_notify_play_handle","rtmp url error");
         return NGX_ERROR;
     }
 
@@ -898,7 +884,7 @@ static ngx_int_t ngx_http_live_notify_play_handle(ngx_http_live_play_relay_ctx_t
 static void ngx_http_live_netcall_timeout(ngx_event_t *ev)
 {
     ngx_http_live_play_relay_ctx_t* ctx = (ngx_http_live_play_relay_ctx_t*)ev->data;
-    printf("ngx_http_live_netcall_timeout....\n");
+    ngx_printf_log("ngx_http_live_play_relay_module","ngx_http_live_netcall_timeout","netcall timeout");
     if(ctx)
     {
         if( ctx->cs && ctx->cs->pc )
@@ -1084,6 +1070,7 @@ static ngx_int_t  ngx_http_live_relay_copy_param(ngx_http_live_play_request_ctx_
 
 ngx_int_t ngx_http_live_relay_on_play(void * ptr)
 {
+    ngx_printf_log("ngx_http_live_play_relay_module","ngx_http_live_relay_on_play","begin");
     ngx_http_live_netcall_init_t ci;
     ngx_http_live_play_request_ctx_t * rc = (ngx_http_live_play_request_ctx_t*)ptr;
     if(rc == NULL)
@@ -1095,7 +1082,7 @@ ngx_int_t ngx_http_live_relay_on_play(void * ptr)
         return NGX_ERROR;
     
     if(rc->relay_ctx == NULL){
-        printf("new ngx_http_live_play_relay_ctx_t\n");
+        ngx_printf_log("ngx_http_live_play_relay_module","ngx_http_live_relay_on_play","create relay ctx");
         rc->relay_ctx = ngx_http_live_relay_alloc_ctx(hrlc);
     }
     if(rc->relay_ctx == NULL)
@@ -1109,7 +1096,7 @@ ngx_int_t ngx_http_live_relay_on_play(void * ptr)
     ngx_http_set_ctx(rc->s, rc->relay_ctx, ngx_http_live_play_relay_module);
     if(ngx_parse_args_list_have_source_addr(rc) == NGX_OK) //判断参数中是否有回源地址,如果有就不需要再调用接口获取回源地址
     {
-        printf("ngx_parse_args_list_have_source_addr \n");
+        ngx_printf_log("ngx_http_live_play_relay_module","ngx_http_live_relay_on_play","ngx_parse_args_list_have_source_addr");
         return ngx_http_trigger_rtmp_relay_pull((void*)rc->s);
     }
     else
@@ -1125,13 +1112,6 @@ ngx_int_t ngx_http_live_relay_on_play(void * ptr)
         ci.arg = (void*)v;
         ci.argsize = strlen(v)+1;
 
-        printf("------ open http live relay module %lx %lx %lx %lx %lx\n",(unsigned long)rc
-        ,(unsigned long)rc->s,(unsigned long)rc->relay_ctx,(unsigned long)rc->s->ctx
-        ,(unsigned long)rc->relay_ctx->rctx);
-
-        ngx_http_live_play_relay_ctx_t *  hrctx = (ngx_http_live_play_relay_ctx_t*)ngx_http_get_module_ctx(rc->s,ngx_http_live_play_relay_module);
-        printf("ngx_http_live_play_relay_module %lx\n",(unsigned long)hrctx);
-
         ngx_int_t rss = ngx_http_live_netcall_create(rc, &ci);
         if(rss ==  NGX_OK)
             rc->relay_ctx->backing = 1;
@@ -1141,9 +1121,9 @@ ngx_int_t ngx_http_live_relay_on_play(void * ptr)
 
 ngx_int_t ngx_http_live_relay_on_play_close(void * ptr)
 {
+    ngx_printf_log("ngx_http_live_play_relay_module","ngx_http_live_relay_on_play_close","begin");
     ngx_http_live_play_relay_ctx_t * relay_ctx = (ngx_http_live_play_relay_ctx_t*)ptr;
-    printf("------ ngx_http_live_relay_on_play_close %lx\n",(unsigned long)relay_ctx);
-        // 删除定时器 
+    // 删除定时器 
     if(relay_ctx)
     {
         relay_ctx->refcount--;
@@ -1165,9 +1145,9 @@ ngx_int_t ngx_http_live_relay_on_play_close(void * ptr)
                 relay_ctx->cs = NULL;
             }
             ngx_http_live_play_relay_free_ctx(relay_ctx,hrlc);
+            ngx_printf_log("ngx_http_live_play_relay_module","ngx_http_live_relay_on_play_close","free relay ctx");
         }
     }
-    printf("------   close http live relay module\n");
     return NGX_OK;
 }
 
@@ -1181,7 +1161,8 @@ ngx_int_t ngx_http_get_relay_status(void* v)
      {
         ngx_http_live_play_relay_ctx_t *  hrctx = (ngx_http_live_play_relay_ctx_t*)rctx->relay_ctx;
         ngx_int_t count = hrlc->reconnect_count_before_302;
-        if(hrctx->reconnect_count >= count ) //重连次数太多/302跳转
+        // if(hrctx->reconnect_count >= count ) //重连次数太多/302跳转
+        if(hrctx->reconnect_count >= count || hrctx->errcount >= count ) //重连次数太多/302跳转
             return NGX_STREAM_REWART;
         if(hrctx->rtmp_pull_url.len <= 7 && hrctx->http_pull_url.len > 7)
             return NGX_STREAM_REWART;   

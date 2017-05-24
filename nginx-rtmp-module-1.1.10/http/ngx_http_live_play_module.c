@@ -287,7 +287,7 @@ ngx_http_parse_play_uri(ngx_str_t uri, ngx_http_live_play_request_ctx_t *pr, ngx
     char* p = (char*)uri.data;
     ngx_uint_t len = 0;
     if (*p != '/'){
-        printf("uri format error!\n");
+        ngx_printf_log("ngx_http_live_play_module","ngx_http_parse_play_uri","url format error");
     } else {
         //获取 app
         p += 1;
@@ -393,7 +393,6 @@ ngx_parse_args(ngx_http_request_t* r,ngx_http_live_play_request_ctx_t* pr)
             char szValue[512] = {'\0'};
             ngx_str_format_string(node->key,szKey);
             ngx_str_format_string(node->value,szValue);
-            printf("param  %s=%s\n",szKey,szValue);
         }   
         list = list->next;
     }
@@ -443,7 +442,7 @@ ngx_http_live_play_close_request(ngx_http_request_t * r)
 		ngx_del_timer(r->connection->write);
 
     ngx_http_set_ctx(r,NULL,ngx_http_live_play_module);
-    printf("r->count %d   r->keepalive %d\n",r->count,r->keepalive);
+    ngx_printf_log("ngx_http_live_play_module","ngx_http_live_play_close_request","close play");
     r->keepalive = 0;
 	ngx_http_finalize_request(r,NGX_DONE);
 }
@@ -472,7 +471,7 @@ ngx_http_live_play_close(void * v)
     if (c->destroyed) {
         return;
     }
-    printf("ngx_http_live_play_close  set close event \n");
+    ngx_printf_log("ngx_http_live_play_module","ngx_http_live_play_close","add close event");
 
     c->destroyed = 1;
     e = &hctx->close;
@@ -501,7 +500,7 @@ ngx_http_live_authentication(ngx_http_live_play_request_ctx_t * r)
 static void 
 ngx_http_live_play_recv_handler(ngx_event_t *ev)
 {
-    printf("ngx_http_live_play_recv_handler \n");
+    ngx_printf_log("ngx_http_live_play_module","ngx_http_live_play_recv_handler","recv data");
     ngx_connection_t * c = (ngx_connection_t *)ev->data;  
     if (c== NULL)
         return;
@@ -513,14 +512,11 @@ ngx_http_live_play_recv_handler(ngx_event_t *ev)
         n = c->recv(c, buf, sizeof(buf));
         if (n == NGX_ERROR || n == 0) {
             ev->error = 1;
-            printf("close in read +++++++++++1\n");
-            
             break;
         }
 
         if (n == NGX_AGAIN) {
             if (ngx_handle_read_event(ev, 0) != NGX_OK) {
-                printf("close in read ------------2\n");
                 ev->error = 1;
                 break;
             } else {
@@ -530,7 +526,6 @@ ngx_http_live_play_recv_handler(ngx_event_t *ev)
         if (n < 0)
             break;
     }
-    printf("close http request %lx\n",(unsigned long)c->data);
     ngx_http_request_t *  r = (ngx_http_request_t * )c->data;
 
     if (n == 0){
@@ -557,12 +552,10 @@ ngx_http_live_play_write_handler(ngx_event_t *ev)
 	if (ev->error != 0){
         r->status_code = ngx_http_live_write_handler_err; 
         ngx_http_live_play_close_request(r);
-        ngx_log_error(NGX_LOG_ERR, c->log, 0, "http_live_play:write handler event error");
 		return;
 	}
 
     if (ev->timedout) {
-        ngx_log_error(NGX_LOG_ERR, c->log, 0, "http_live_client timed out");
         c->timedout = 1;
         r->status_code = ngx_http_live_client_timedout; 
         ngx_http_live_play_close_request(r);
@@ -600,7 +593,7 @@ ngx_http_live_play_write_handler(ngx_event_t *ev)
                        hctx->frame_chain_tail = hctx->frame_chain_head;
 
                     ngx_add_timer(c->write, hlplc->http_send_timeout);
-                    printf("ngx_handle_write_event %lx %lx\n",(unsigned long)frame,(unsigned long)frame->out);
+                    ngx_printf_log("ngx_http_live_play_module","ngx_http_live_play_write_handler","ngx_handle_write_event");
                     if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
                         r->status_code = ngx_http_live_write_event_err; 
                         ngx_http_live_play_close_request(r);
@@ -611,7 +604,6 @@ ngx_http_live_play_write_handler(ngx_event_t *ev)
                     if (n < 0) {
                         r->status_code = ngx_http_live_send_data_err; 
                         ngx_http_live_play_close_request(r);
-                        printf("ngx_handle_write_event send data fail\n");
                         return;
                     }
                     hctx->current_send_count++;
@@ -694,11 +686,10 @@ ngx_http_live_play_respond_header(ngx_http_live_play_request_ctx_t *r,
         r->header_chain->buf->last = ngx_snprintf(r->header_chain->buf->pos, buf_len, szformat,
                 ngx_http_live_play_status[index].rs, &ngx_cached_http_time, content_type);
     }
-    //    printf("%s\n",r->header_chain->buf->pos);
     r->s->header_sent = 1;
     r->send_header_flag = 1;
     r->header_chain->next = NULL;
-    printf("ngx_http_live_play_respond_header header packet\n");
+    ngx_printf_log("ngx_http_live_play_module","ngx_http_live_play_respond_header","send header");
     ngx_chain_t               *cl;
     cl = r->s->connection->send_chain(r->s->connection, r->header_chain, 0);
     if (cl == NGX_CHAIN_ERROR)
@@ -797,16 +788,15 @@ ngx_http_live_play_handler(ngx_http_request_t * r)
     char args[1024] = {'\0'};
     ngx_str_format_string(r->uri, str);
     ngx_str_format_string(r->args, args);
-    printf("mothod %ld, uri %s, args %s\n",r->method,str,args);
     // print 
-    
+    ngx_printf_log("ngx_http_live_play_module","ngx_http_live_play_handler","mothod %ld, uri %s, args %s",r->method,str,args);
+
     pr = (ngx_http_live_play_request_ctx_t*)ngx_pcalloc(r->pool,sizeof(ngx_http_live_play_request_ctx_t));
     if (ngx_http_parse_play_uri(r->uri, pr, r) !=  NGX_OK) {
         r->status_code = ngx_http_live_parse_play_uri_err; 
         ngx_http_live_play_close_request(r);
         return NGX_ERROR;
     }
-    // printf("app:%s stream:%s suffix:%s\n", pr->app.data, pr->stream.data, pr->suffix.data);
     if (ngx_parse_args(r, pr) != NGX_OK) {
         r->status_code = ngx_http_live_parse_play_arg_err; 
         ngx_http_live_play_close_request(r);
@@ -824,17 +814,14 @@ ngx_http_live_play_handler(ngx_http_request_t * r)
     // 纯粹为了打印
     char app[64] = {'\0'};
     char stream[256] = {'\0'};
-    char param[1024] = {'\0'};
+    //char param[1024] = {'\0'};
     char suffix[16] = {'\0'};
     ngx_str_format_string(pr->app,app);
     ngx_str_format_string(pr->stream,stream);
     ngx_str_format_string(pr->suffix,suffix);
-    printf("app : %s stream : %s  param : %s suffix : %s\n",app,stream,param,suffix);
 
     ngx_http_set_ctx(r,pr,ngx_http_live_play_module);
 
-    printf("ngx_http_set_ctx  %lx  %lx %lx\n",(unsigned long)pr,(unsigned long)pr->s,(unsigned long)r);
-    //r->keepalive = 0;
     ngx_http_live_play_process_slot((u_char*)stream,strlen(stream));
 
     if(ngx_http_live_authentication(pr) != NGX_OK) //鉴权
@@ -859,7 +846,6 @@ ngx_http_live_play_handler(ngx_http_request_t * r)
                     e->handler = ngx_http_live_play_send_header_ev;
                     ngx_add_timer(e, 1000);
                 }
-                printf("waiting stream back end\n");
             }else if(rc == NGX_STREAM_REWART){ //直接302 跳转
                   if(pr->relay_ctx && pr->relay_ctx->http_pull_url.len > 0){
                        char location[1024] = {'\0'};
@@ -884,7 +870,6 @@ ngx_http_live_play_handler(ngx_http_request_t * r)
         }else{
             if(ngx_http_live_play_respond_header(pr,HTTP_STATUS_200,"Video/x-flv",NULL) == NGX_ERROR)
             {
-                printf("send header error NGX_HTTP_NOT_ALLOWED\n");
                 r->status_code = ngx_http_live_not_allowed; 
                 ngx_http_live_play_close_request(r);
 		        return NGX_HTTP_NOT_ALLOWED;
@@ -892,12 +877,10 @@ ngx_http_live_play_handler(ngx_http_request_t * r)
             pr->send_header_flag = 1;
         }
     }
-    printf("process end\n");
     r->connection->read->handler = ngx_http_live_play_recv_handler;
     r->connection->data = r;
     r->connection->read->data =r->connection;
     r->rewrite_close = 1;
-    printf("ngx_http_set_ctx  %lx  %lx %lx\n",(unsigned long)pr,(unsigned long)pr->s,(unsigned long)r);
     return NGX_OK;
 }
 
@@ -997,7 +980,7 @@ ngx_http_live_send_message(ngx_http_live_play_request_ctx_t *pr, ngx_chain_t* ou
     // 打印日志
     //判断是否还能处理数据
     if(ngx_http_paly_cache_process(pr, mtype) !=  NGX_OK) {
-        printf("dorp frame  %c  len %d pts %d\n",mtype,mlen,pts);
+        printf("dorp frame  %c  len %d pts %d caton:%ld\n",mtype,mlen,pts, pr->start_caton);
         if(mtype >= HTTP_FLV_VIDEO_TAG) {
             pr->drop_vduration += delta;
             pr->drop_vframe_num++;
@@ -1006,9 +989,12 @@ ngx_http_live_send_message(ngx_http_live_play_request_ctx_t *pr, ngx_chain_t* ou
         } else if (mtype == HTTP_FLV_AUDIO_TAG) {
             pr->drop_audio_size += mlen;
         }
+        pr->dropVideoFrame++; // 总的
 
         if (pr->start_caton == 0) {
+            printf("############## NGX_EDGE_BUFFER_START\n");
             ngx_rtmp_edge_log(NGX_EDGE_HTTP, NGX_EDGE_BUFFER_START, pr, pr->current_ts);
+            pr->start_caton = 1;
         }
 
         return NGX_ERROR;
@@ -1020,11 +1006,12 @@ ngx_http_live_send_message(ngx_http_live_play_request_ctx_t *pr, ngx_chain_t* ou
         
         if (pr->start_caton == 1) {
             ngx_rtmp_edge_log(NGX_EDGE_HTTP, NGX_EDGE_BUFFER_STOP, pr, pr->current_ts);
-            
+                        
             pr->drop_vduration = 0;
             pr->drop_vframe_num = 0;
             pr->drop_video_size = 0;
             pr->drop_audio_size = 0;
+            
             pr->start_caton = 0;
         }
     }
@@ -1050,8 +1037,6 @@ ngx_http_live_send_message(ngx_http_live_play_request_ctx_t *pr, ngx_chain_t* ou
 
     if (!pr->s->connection->write->active) {
         ngx_http_live_play_write_handler(pr->s->connection->write);
-        // printf("ngx_http_live_send_message  send data to net ----\n");
-        /*return ngx_add_event(r->connection->write, NGX_WRITE_EVENT, NGX_CLEAR_EVENT);*/
     }
     
     // 日志相关 
@@ -1062,7 +1047,7 @@ ngx_http_live_send_message(ngx_http_live_play_request_ctx_t *pr, ngx_chain_t* ou
     }
     pr->recv_video_frame += 1;
 
-    if ( (pr->current_ts-pr->log_lts) >= NGX_RTMP_BANDWIDTH_INTERVAL*1000) {
+    if (pr->current_ts-pr->log_lts >= global_poll) {
         if (pr->log_type == 0) { 
             ngx_rtmp_edge_log(NGX_EDGE_HTTP, NGX_EDGE_PULL_START, pr, pr->current_ts);
             pr->log_type = 1;
@@ -1103,12 +1088,10 @@ ngx_http_live_play_send_header_ev(ngx_event_t *ev)
         }else{
             if(!ev->timer_set)
                 ngx_add_timer(ev, 1000);
-            printf("ngx_http_live_play_send_header_ev %ld\n",hctx->send_header_ev_count);
         }
     }
     else
     {
-        printf("send  header timeout %lx %lx %lx\n",(unsigned long)hctx,(unsigned long)hctx->s,(unsigned long)r);
         if(hctx->relay_ctx && hctx->relay_ctx->http_pull_url.len > 0){
             char location[1024] = {'\0'};
             ngx_str_format_string(hctx->relay_ctx->http_pull_url,location);
@@ -1132,8 +1115,6 @@ ngx_http_live_play_send_data_timeout_ev(ngx_event_t *ev)
     if(c == NULL ||  r == NULL || hctx == NULL)
         return ;
         
-    printf("send  data timeout %lx %lx %lx\n",(unsigned long)hctx,(unsigned long)hctx->s,(unsigned long)r);
-
     r->status_code = ngx_http_live_send_data_timedout; 
     ngx_http_live_play_close_request(r);
 }
@@ -1168,13 +1149,12 @@ ngx_http_live_play_send_http_header(void* ptr)
             e->log = hctx->s->connection->log;
             e->handler = ngx_http_live_play_send_data_timeout_ev;
             ngx_add_timer(e, lacf->http_idle_timeout);
-            printf("set play timeout timer\n");
         }
     }
 
     if(hctx->send_header_flag == 1) //表示已经发送过头信息
         return NGX_OK;
-
+    ngx_printf_log("ngx_http_live_play_module","ngx_http_live_play_send_http_header","send header");
 
     rc = ngx_http_get_stream_status((void*)hctx);
 
@@ -1200,7 +1180,6 @@ ngx_http_live_play_send_http_header(void* ptr)
     if(ngx_http_live_play_respond_header(hctx,status,"Video/x-flv",location) == NGX_ERROR
             ||rc != NGX_OK )
     {
-        printf("send header error\n");
         ngx_http_live_play_close(hctx);
 		return NGX_ERROR;
     }

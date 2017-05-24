@@ -189,16 +189,12 @@ ngx_rtmp_cmd_connect_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             (uint32_t)v.acodecs, (uint32_t)v.vcodecs,
             (ngx_int_t)v.object_encoding);
 
-    printf("connect tc_url:%s\n", s->tc_url.data);
-
     return ngx_rtmp_connect(s, &v);
 }
 
 static ngx_int_t
 ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
 {
-    printf("ngx_rtmp_cmd_module ngx_rtmp_cmd_connect\n");
-
     ngx_rtmp_core_srv_conf_t   *cscf;
     ngx_rtmp_core_app_conf_t  **cacfp;
     ngx_uint_t                  n;
@@ -290,8 +286,6 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
 
 #undef NGX_RTMP_SET_STRPAR
     
-    printf("$$$$$$$$$$$$$ %s\n", s->tc_url.data);
-
     p = ngx_strlchr(s->app.data, s->app.data + s->app.len, '?');
     if (p) {
         s->app.len = (p - s->app.data);
@@ -480,8 +474,6 @@ ngx_rtmp_cmd_init_name(ngx_rtmp_session_t *s, u_char *name, ngx_uint_t  publishe
     
     s->name.len = ngx_strlen(name);
     s->name.data = name;
-    // printf("$$$$$$$$$$$$ name:%s %s\n", name, s->name.data);
-    // printf("$$$$$$$$$$$$ tc_url:%s\n", s->tc_url.data);
 
     s->pull_url.len = s->tc_url.len + 1 + s->name.len;
     s->pull_url.data = ngx_pcalloc(s->connection->pool, s->pull_url.len+1);
@@ -489,15 +481,12 @@ ngx_rtmp_cmd_init_name(ngx_rtmp_session_t *s, u_char *name, ngx_uint_t  publishe
     ngx_memcpy(s->pull_url.data, s->tc_url.data, s->tc_url.len);
     s->pull_url.data[s->tc_url.len] = '/';
     ngx_memcpy(s->pull_url.data + s->tc_url.len + 1, s->name.data, s->name.len);   
-    // printf("$$$$$$$$$$$$ pull_url:%s\n", s->pull_url.data);
 }
 
 static ngx_int_t
 ngx_rtmp_cmd_publish_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_chain_t *in)
 {
-    printf("ngx_rtmp_cmd_module ngx_rtmp_cmd_publish_init\n");
-    
     static ngx_rtmp_publish_t       v;
 
     static ngx_rtmp_amf_elt_t      in_elts[] = {

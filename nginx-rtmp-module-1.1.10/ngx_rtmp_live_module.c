@@ -761,7 +761,6 @@ static ngx_int_t
 ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_chain_t *in)
 {
-    // printf("############## %ld %s\n", s->addr_text->len, s->addr_text->data);
     
     ngx_rtmp_live_ctx_t            *ctx, *pctx;
     ngx_rtmp_codec_ctx_t           *codec_ctx;
@@ -882,7 +881,6 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         rpkt = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
         ngx_rtmp_prepare_message(s, &ch, &lh, rpkt);
         rpkt_destory = 1;
-        printf("-------------------------------\n");
     }
 
     codec_ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
@@ -967,7 +965,6 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             cs->active = 0;
             cs->dropped = 0;
 
-            printf("live: sync %s dropped=%uD\n", type_s, cs->dropped);
         }
 
         /* absolute packet */
@@ -982,8 +979,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             //liw
             if(lacf->cache_gop)
             {
-                printf("ngx_rtmp_media_data_cache_send  \n");
-                ngx_media_data_cache_send(s,(void*)pctx,RTMP_PROTOCOL);
+                ngx_media_data_cache_send(s,(void*)pctx,RTMP_PROTOCOL, 0);
                 continue;
             }
 
@@ -1096,6 +1092,8 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
             cs->dropped += delta;
 
+            ss->dropVideoFrame++;
+
             if (mandatory) {
                 ngx_log_debug0(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0,
                                "live: mandatory packet failed");
@@ -1107,7 +1105,6 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         }
 
         cs->timestamp += delta;
-        //printf("ngx_rtmp_send_message %s %d\n",type_s,cs->timestamp);
         ++peers;
         ss->current_time = cs->timestamp;
         
@@ -1120,8 +1117,8 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ss->recv_video_frame += 1;
         ss->stream_ts = h->timestamp;
         ss->delta     = delta;
-        
-        if (current_ts-ss->log_lts >= NGX_RTMP_BANDWIDTH_INTERVAL*1000) {
+
+        if (current_ts-ss->log_lts >= global_poll) {
             if (ss->log_type == 0) {
                 ngx_rtmp_edge_log(NGX_EDGE_RTMP, NGX_EDGE_PULL_START, ss, current_ts);
                 ss->log_type = 1;    
@@ -1181,7 +1178,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         }    
     }
     
-    if ( (current_ts-s->log_lts) >= NGX_RTMP_BANDWIDTH_INTERVAL*1000 && s->log_type == 1 ) {
+    if (current_ts-s->log_lts >= global_poll && s->log_type==1) {
         ngx_rtmp_edge_log(NGX_EDGE_RTMP, NGX_EDGE_PUSH_WATCH, s , current_ts);
          
         s->lrecv_video_size = s->recv_video_size;
@@ -1196,7 +1193,6 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     
     //判断如果冷流在一定时间内没有人观看，则把流断开，防止上行带宽过载浪费
     if(ngx_rtmp_check_up_idle_stream(s,RTMP_PROTOCOL) !=  NGX_OK){
-        printf("rtmp ngx_rtmp_check_up_idle_stream\n");
         s->status_code = ngx_rtmp_live_idel_stream;
         ngx_rtmp_finalize_session(s);
     }

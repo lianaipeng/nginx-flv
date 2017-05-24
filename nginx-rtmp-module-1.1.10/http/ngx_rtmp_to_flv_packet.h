@@ -5,6 +5,7 @@
 
 ngx_int_t ngx_http_flv_prepare_message(ngx_rtmp_header_t *h,ngx_chain_t* in, ngx_chain_t *out,unsigned int * out_size);
 
+ngx_int_t ngx_http_rewrite_tag_pts(int_4 pts,ngx_chain_t* in);
 
 ngx_chain_t* ngx_http_flv_perpare_meta_header(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h
                                         ,ngx_chain_t *out);  //header =  flv header tag + mediadata tag

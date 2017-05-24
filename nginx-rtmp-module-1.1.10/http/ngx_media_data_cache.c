@@ -36,7 +36,6 @@ static void  free_media_node(ngx_media_data_cache_t* cache,ngx_media_data_node_t
     }
 }
 
-int vide_frame = 0;
 //rtmp cache
 ngx_chain_t* ngx_rtmp_media_data_cache_write(ngx_rtmp_session_t* s, ngx_rtmp_header_t *h, 
         ngx_chain_t* in,ngx_rtmp_header_t *ch, ngx_rtmp_header_t *lh,ngx_int_t type)
@@ -95,13 +94,6 @@ ngx_chain_t* ngx_rtmp_media_data_cache_write(ngx_rtmp_session_t* s, ngx_rtmp_hea
             node->prio = (h->type == NGX_RTMP_MSG_VIDEO ? node->key_frame : 0);
             node->cache_chain = rpkt;
             node->next = NULL;
-
-            if(node->key_frame == 1 )
-            {
-                //printf("video gop size is %d\n",vide_frame);
-                vide_frame = 0;
-            }
-
             if(ctx->media_cache->busy_cache_head == NULL)
             {
                  ctx->media_cache->busy_cache_head = node;
@@ -126,7 +118,6 @@ ngx_chain_t* ngx_rtmp_media_data_cache_write(ngx_rtmp_session_t* s, ngx_rtmp_hea
             else if(h->type == NGX_RTMP_MSG_VIDEO)
             {
                 ctx->media_cache->video_cache_frame_num++;
-                 vide_frame++;
                 ctx->media_cache->video_cache_duration += node->delta;
             }
             ctx->media_cache->cache_duration 
@@ -143,13 +134,8 @@ ngx_chain_t* ngx_rtmp_media_data_cache_write(ngx_rtmp_session_t* s, ngx_rtmp_hea
                     ngx_media_data_node_t * ln = ctx->media_cache->busy_cache_head;
                     ctx->media_cache->busy_cache_head = ln->next;
 
-                    //printf("delete video frame num %ld  audio frame num %ld ,gop num %ld\n"
-                    //,ctx->media_cache->video_cache_frame_num,ctx->media_cache->audio_cache_frame_num
-                    //,ctx->media_cache->cache_gop_num);
-                    int vide_delframe = 0;
                     while(ln)
                     {
-                        //printf("delete frame  %ld\n",ln->mtype);
                         if(ln->mtype == NGX_RTMP_MSG_AUDIO)
                         {
                             ctx->media_cache->audio_cache_frame_num--;
@@ -158,7 +144,6 @@ ngx_chain_t* ngx_rtmp_media_data_cache_write(ngx_rtmp_session_t* s, ngx_rtmp_hea
                         else if(ln->mtype == NGX_RTMP_MSG_VIDEO)
                         {
                             ctx->media_cache->video_cache_frame_num--;
-                            vide_delframe++;
                             ctx->media_cache->video_cache_duration -= ln->delta;
                         }
 
@@ -172,7 +157,6 @@ ngx_chain_t* ngx_rtmp_media_data_cache_write(ngx_rtmp_session_t* s, ngx_rtmp_hea
                         ln = ctx->media_cache->busy_cache_head;
                         if(ln == NULL )
                         {
-                            //printf("meadia cache queue empty break\n");
                             break;  
                         }
                         if(ln->key_frame == 1 && ln->mtype == NGX_RTMP_MSG_VIDEO)
@@ -182,10 +166,6 @@ ngx_chain_t* ngx_rtmp_media_data_cache_write(ngx_rtmp_session_t* s, ngx_rtmp_hea
 
                         ctx->media_cache->busy_cache_head = ln->next;
                     }
-
-                     //printf("video frame num %ld  audio frame num %ld ,gop num %ld del video frame %d\n"
-                    //,ctx->media_cache->video_cache_frame_num,ctx->media_cache->audio_cache_frame_num
-                    //,ctx->media_cache->cache_gop_num,vide_delframe);
                 }
             }
         }
@@ -194,7 +174,6 @@ ngx_chain_t* ngx_rtmp_media_data_cache_write(ngx_rtmp_session_t* s, ngx_rtmp_hea
     return NULL;
 }
 
-int http_video_frame = 0;
 //http flv cache
 ngx_chain_t* 
 ngx_http_flv_media_data_cache_write(ngx_rtmp_session_t* s, ngx_rtmp_header_t *h, ngx_chain_t* in,
@@ -243,7 +222,6 @@ ngx_http_flv_media_data_cache_write(ngx_rtmp_session_t* s, ngx_rtmp_header_t *h,
     rpkt = ngx_http_flv_base_alloc_tag_mem(h->mlen);
     if (rpkt == NULL)
         return NULL;
-
     // 组装tag 
     if (ngx_http_flv_prepare_message(h, in, rpkt, &tag_size) != NGX_OK) {
         ngx_http_flv_free_tag_mem(rpkt);
@@ -260,11 +238,6 @@ ngx_http_flv_media_data_cache_write(ngx_rtmp_session_t* s, ngx_rtmp_header_t *h,
         node->prio = (h->type == NGX_RTMP_MSG_VIDEO ? node->key_frame : 0);
         node->cache_chain = rpkt;
         node->next = NULL;
-
-        if (node->key_frame == 1 ) {
-            printf("http flv video gop size is %d\n",http_video_frame);
-            http_video_frame = 0;
-        }
 
         if (ctx->media_cache->busy_cache_head == NULL) {
             ctx->media_cache->busy_cache_head = node;
@@ -283,7 +256,6 @@ ngx_http_flv_media_data_cache_write(ngx_rtmp_session_t* s, ngx_rtmp_header_t *h,
             ctx->media_cache->audio_cache_duration += node->delta;
         } else if (h->type == NGX_RTMP_MSG_VIDEO) {
             ctx->media_cache->video_cache_frame_num++;
-            http_video_frame++;
             ctx->media_cache->video_cache_duration += node->delta;
         }
         ctx->media_cache->cache_duration 
@@ -298,21 +270,12 @@ ngx_http_flv_media_data_cache_write(ngx_rtmp_session_t* s, ngx_rtmp_header_t *h,
                 ngx_media_data_node_t * ln = ctx->media_cache->busy_cache_head;
                 ctx->media_cache->busy_cache_head = ln->next;
                 
-                /*
-                 printf("http flv delete video frame num %ld  audio frame num %ld ,gop num %ld\n"
-                        ,ctx->media_cache->video_cache_frame_num,ctx->media_cache->audio_cache_frame_num
-                        ,ctx->media_cache->cache_gop_num);
-                        */
-
-                int vide_delframe = 0;
                 while (ln) {
-                    //printf("delete frame  %ld\n",ln->mtype);
                     if (ln->mtype == NGX_RTMP_MSG_AUDIO) {
                         ctx->media_cache->audio_cache_frame_num--;
                         ctx->media_cache->audio_cache_duration -= ln->delta;
                     } else if(ln->mtype == NGX_RTMP_MSG_VIDEO) {
                         ctx->media_cache->video_cache_frame_num--;
-                        vide_delframe++;
                         ctx->media_cache->video_cache_duration -= ln->delta;
                     }
 
@@ -320,14 +283,11 @@ ngx_http_flv_media_data_cache_write(ngx_rtmp_session_t* s, ngx_rtmp_header_t *h,
                         ctx->media_cache->audio_cache_duration > ctx->media_cache->video_cache_duration
                         ? ctx->media_cache->audio_cache_duration : ctx->media_cache->video_cache_duration;
 
-                    //ngx_rtmp_free_shared_chain(cscf, ln->cache_chain);
-
                     ngx_http_flv_free_tag_mem(ln->cache_chain);
                     free_media_node(ctx->media_cache,ln);
 
                     ln = ctx->media_cache->busy_cache_head;
                     if (ln == NULL ) {
-                        printf("http flv meadia cache queue empty break\n");
                         break;  
                     }
                     if (ln->key_frame == 1 && ln->mtype == NGX_RTMP_MSG_VIDEO) {
@@ -336,12 +296,6 @@ ngx_http_flv_media_data_cache_write(ngx_rtmp_session_t* s, ngx_rtmp_header_t *h,
 
                     ctx->media_cache->busy_cache_head = ln->next;
                 }
-                    
-                /*
-                 printf("http flv video frame num %ld  audio frame num %ld ,gop num %ld del video frame %d\n"
-                        ,ctx->media_cache->video_cache_frame_num,ctx->media_cache->audio_cache_frame_num
-                        ,ctx->media_cache->cache_gop_num,vide_delframe);
-                        */
             }
         }
     }
@@ -353,7 +307,7 @@ ngx_media_data_cache_write(ngx_rtmp_session_t* s, ngx_rtmp_header_t *h, ngx_chai
         ngx_rtmp_header_t *ch, ngx_rtmp_header_t *lh, ngx_int_t type)
 {
     if (ngx_rtmp_is_codec_header(in))
-        return NULL;
+       return NULL;
         
     if (type == RTMP_PROTOCOL) {
         return ngx_rtmp_media_data_cache_write(s,h,in,ch,lh,type);
@@ -363,7 +317,7 @@ ngx_media_data_cache_write(ngx_rtmp_session_t* s, ngx_rtmp_header_t *h, ngx_chai
     return NULL;
 }
 
-ngx_int_t ngx_rtmp_media_data_cache_send(ngx_rtmp_session_t* s,void* ptrctx)
+ngx_int_t ngx_rtmp_media_data_cache_send(ngx_rtmp_session_t* s,void* ptrctx,ngx_int_t only_send_header)
 {
     ngx_chain_t* rpkt = NULL;
     ngx_chain_t* apkt = NULL;
@@ -397,22 +351,18 @@ ngx_int_t ngx_rtmp_media_data_cache_send(ngx_rtmp_session_t* s,void* ptrctx)
 
     if(cache == NULL ||  ss == NULL || cache->busy_cache_head == NULL)
     {
-        //printf("cache  is empty\n");
         return NGX_OK;
     }
 
     if(cache->aac_header == NULL || cache->avc_header == NULL )
     {
-        //printf("aac or avc header is empty\n");
         return NGX_OK;
     }
 
     if(cache->aac_header && !acs->active){
-       // printf("send audio aac header\n");
         if (apkt == NULL) {
             ngx_rtmp_header_t lh;
 
-            //lh.timestamp = cache->busy_cache_head->mcpts;
             lh.timestamp = 0;
             lh.msid = NGX_RTMP_MSID;
             lh.csid = acs->csid;
@@ -433,7 +383,6 @@ ngx_int_t ngx_rtmp_media_data_cache_send(ngx_rtmp_session_t* s,void* ptrctx)
     }
 
     if(cache->avc_header && !vcs->active){
-        // printf("send video avc header\n");
         if (vpkt == NULL) {
             ngx_rtmp_header_t lh;
             //lh.timestamp = cache->busy_cache_head->mcpts;
@@ -459,7 +408,6 @@ ngx_int_t ngx_rtmp_media_data_cache_send(ngx_rtmp_session_t* s,void* ptrctx)
     if(!vcs->active || !acs->active)
         return NGX_OK;
     
-    //printf("send data\n");
     ngx_media_data_node_t * ln = cache->busy_cache_head;
 
     while(ln)
@@ -492,14 +440,12 @@ ngx_int_t ngx_rtmp_media_data_cache_send(ngx_rtmp_session_t* s,void* ptrctx)
         if (ngx_rtmp_send_message(ss, rpkt, ln->prio) != NGX_OK) {
             ++pctx->ndropped;
             cs->dropped += delta;
-                //printf("***send packet error\n");
         }
 
         const char                     *type_s;
         type_s = (ln->mtype == NGX_RTMP_MSG_VIDEO ? "video" : "audio");
         cs->timestamp += delta;
         ss->current_time = cs->timestamp;
-        //printf("send packet %s  pts %d size %d\n",type_s,cs->timestamp,mlen);
         
         ln = ln->next;
         if(ln ==NULL)
@@ -526,7 +472,7 @@ ngx_http_flv_send_header(ngx_rtmp_session_t *s, void *ptr)
     if (lacf == NULL || ctx == NULL || pctx == NULL) {
         return NGX_ERROR;
     }
-
+   
     vcs = &pctx->cs[0];
     acs = &pctx->cs[1];
 
@@ -535,12 +481,10 @@ ngx_http_flv_send_header(ngx_rtmp_session_t *s, void *ptr)
     if (ctx->stream->aac_tag_size <= 0 
         || ctx->stream->avc_tag_size <= 0 
         || ctx->stream->meta_tag_size <= 0) {
-        printf("http flv header error\n");
         return NGX_ERROR;
     }
     
-    if (ctx->stream->aac_tag_size > 0){
-        printf("send flv header\n");
+    if (ctx->stream->meta_tag_size > 0){
         rc = ngx_http_live_send_message(ss, ctx->stream->meta_conf_tag, HTTP_FLV_META_TAG , ctx->stream->aac_tag_size, 0, 0);
         if (rc != NGX_OK) {
             return NGX_ERROR;
@@ -548,7 +492,6 @@ ngx_http_flv_send_header(ngx_rtmp_session_t *s, void *ptr)
     }
     
     if (!acs->active && ctx->stream->aac_tag_size > 0){
-        printf("send audio aac header\n");
         rc = ngx_http_live_send_message(ss, ctx->stream->aac_conf_tag, HTTP_FLV_AAC_TAG, ctx->stream->aac_tag_size, 0, 0);
         if (rc != NGX_OK) {
             return NGX_ERROR;
@@ -559,7 +502,6 @@ ngx_http_flv_send_header(ngx_rtmp_session_t *s, void *ptr)
     }
 
     if (!vcs->active && ctx->stream->avc_tag_size > 0){
-        printf("send video avc header\n");
         rc = ngx_http_live_send_message(ss, ctx->stream->avc_conf_tag, HTTP_FLV_AVC_TAG, ctx->stream->avc_tag_size, 0, 0);
         if (rc != NGX_OK) {
             return NGX_ERROR;
@@ -574,7 +516,7 @@ ngx_http_flv_send_header(ngx_rtmp_session_t *s, void *ptr)
 }
 
 ngx_int_t 
-ngx_http_flv_media_data_cache_send(ngx_rtmp_session_t *s, void *ptrctx)
+ngx_http_flv_media_data_cache_send(ngx_rtmp_session_t *s, void *ptrctx,ngx_int_t only_send_header)
 {
     ngx_chain_t* rpkt = NULL;
 
@@ -605,57 +547,64 @@ ngx_http_flv_media_data_cache_send(ngx_rtmp_session_t *s, void *ptrctx)
     acs = &pctx->cs[1];
 
     if (cache == NULL ||  ss == NULL || cache->busy_cache_head == NULL) {
-        printf("http flv cache  is empty\n");
-        return NGX_OK;
+        return NGX_ERROR;
     }
     
     // 发送flv header
     if (ngx_http_flv_send_header(s, pctx) != NGX_OK) {
-        printf("http flv : send header error\n");
-        return NGX_OK;
+        return NGX_ERROR;
     }
-    
-    printf("ngx_http_flv_media_data_cache_send send data\n");
+
+    if(only_send_header == 1)
+        return NGX_OK;
+
     ngx_media_data_node_t * ln = cache->busy_cache_head;
 
     while (ln) {
         u_char mtype = 0;
         ngx_rtmp_live_chunk_stream_t * cs = NULL;
         ngx_uint_t   delta = 0;
-
+        ngx_int_t    send_flag = 1;
         if (ln->mtype == NGX_RTMP_MSG_AUDIO) {
+
             mtype = HTTP_FLV_AUDIO_TAG;
             cs = acs;
+            if(ln->mcpts < pctx->stream->aac_tag_pts)
+                send_flag = 0;
+            
         } else if (ln->mtype == NGX_RTMP_MSG_VIDEO) {
+
             mtype = HTTP_FLV_VIDEO_TAG;
             if (ln->key_frame == 1) {
                 mtype = HTTP_FLV_VIDEO_KEY_FRAME_TAG;
             }
             cs = vcs;
+            if(ln->mcpts < pctx->stream->avc_tag_pts)
+                send_flag = 0;
         } else {
-            continue;
+            send_flag = 0;
         }
-        rpkt = ln->cache_chain;
-        delta = ln->delta;
+        if(send_flag)
+        {
+            rpkt = ln->cache_chain;
+            delta = ln->delta;
 
-        int mlen = 0;
-        ngx_chain_t * l;
-        for (l = rpkt; l; l = l->next) {
-            mlen += (l->buf->last - l->buf->pos);
+            int mlen = 0;
+            ngx_chain_t * l;
+            for (l = rpkt; l; l = l->next) {
+                mlen += (l->buf->last - l->buf->pos);
+            }
+
+            if (ngx_http_live_send_message(ss, rpkt, mtype, mlen, ln->mcpts, ln->delta) != NGX_OK) {
+                ++pctx->ndropped;
+                cs->dropped += delta;
+            }
+
+            const char                     *type_s;
+            type_s = (ln->mtype == NGX_RTMP_MSG_VIDEO ? "video" : "audio");
+            cs->timestamp += delta;
+            ss->current_time = cs->timestamp;
         }
-
-        if (ngx_http_live_send_message(ss, rpkt, mtype, mlen, ln->mcpts, ln->delta) != NGX_OK) {
-            ++pctx->ndropped;
-            cs->dropped += delta;
-                printf("***send packet error\n");
-        }
-
-        const char                     *type_s;
-        type_s = (ln->mtype == NGX_RTMP_MSG_VIDEO ? "video" : "audio");
-        cs->timestamp += delta;
-        ss->current_time = cs->timestamp;
-        // printf("ngx_http_flv_media_data_cache_send send packet %s pts %d size %d\n",type_s,cs->timestamp,mlen);
-        
         ln = ln->next;
         if (ln ==NULL)
             break;
@@ -665,12 +614,12 @@ ngx_http_flv_media_data_cache_send(ngx_rtmp_session_t *s, void *ptrctx)
 
 
 ngx_int_t 
-ngx_media_data_cache_send(ngx_rtmp_session_t* s, void *ctx, ngx_int_t type)
+ngx_media_data_cache_send(ngx_rtmp_session_t* s, void *ctx, ngx_int_t type,ngx_int_t only_send_header)
 {
     if (type == RTMP_PROTOCOL) {
-        return ngx_rtmp_media_data_cache_send(s, ctx);
+        return ngx_rtmp_media_data_cache_send(s, ctx,only_send_header);
     } else if (type == HTTP_FLV_PROTOCOL) {
-        return ngx_http_flv_media_data_cache_send(s, ctx);
+        return ngx_http_flv_media_data_cache_send(s, ctx,only_send_header);
     }
     return NGX_OK;
 }
@@ -766,7 +715,6 @@ ngx_int_t ngx_rtmp_check_up_idle_stream(ngx_rtmp_session_t *s,int type)
                 {
                     if(type == HTTP_FLV_PROTOCOL)
                     {
-                        // printf("ngx_rtmp_check_up_idle_stream current_time-busy_time:%d idle_up_stream_destory:%ld\n", (s->current_time - s->busy_time), cscf->idle_up_stream_destory);
                         if (s->current_time > s->busy_time) {
                             if((s->current_time - s->busy_time) > cscf->idle_up_stream_destory)
                             {
@@ -784,6 +732,18 @@ ngx_int_t ngx_rtmp_check_up_idle_stream(ngx_rtmp_session_t *s,int type)
                 }
             }
          }
+     }
+    return NGX_OK;
+}
+
+ngx_int_t ngx_http_check_tag_pts(ngx_chain_t* in,unsigned int tagpts,unsigned int cspts,int delta)
+{
+    if(cspts > tagpts)
+    {
+        if(delta < 0 )
+            delta = 0;
+        int_4 pts = cspts + delta;
+        ngx_http_rewrite_tag_pts(pts,in);
     }
     return NGX_OK;
 }

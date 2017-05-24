@@ -452,6 +452,14 @@ ngx_chain_t* ngx_http_flv_perpare_meta_header(ngx_rtmp_session_t *s, ngx_rtmp_he
     flv_len += meta_data_size;
     return out;
 }
+ngx_int_t ngx_http_rewrite_tag_pts(int_4 pts,ngx_chain_t* in)
+{
+    if(in == NULL)
+        return NGX_ERROR;
+    u_char* data = in->buf->pos + 4;
+    FLVFILECOPYSTMP(pts, data); 
+    return NGX_OK;
+}
 
 ngx_int_t ngx_http_flv_prepare_message(ngx_rtmp_header_t *h,ngx_chain_t* in, ngx_chain_t *out,unsigned int * out_size)
 {
@@ -588,7 +596,7 @@ ngx_http_flv_perpare_header(ngx_rtmp_session_t *session, void *ctx, ngx_rtmp_hea
     
     // 缓存 AAC 
     // audio header tag
-    if (has_audio) {
+    if (has_audio && codec_ctx->aac_header) {
         if (stream->aac_conf_tag == NULL) 
             stream->aac_conf_tag = ngx_http_flv_base_alloc_tag_mem(stream->tag_buf_len);
         
@@ -602,11 +610,12 @@ ngx_http_flv_perpare_header(ngx_rtmp_session_t *session, void *ctx, ngx_rtmp_hea
         h->type = NGX_RTMP_MSG_AUDIO;
         if (ngx_http_flv_prepare_message(h, codec_ctx->aac_header, stream->aac_conf_tag, &stream->aac_tag_size) == NGX_ERROR)
             return NGX_ERROR;
+        stream->aac_tag_pts = h->timestamp;
     }
     
     // 缓存 AVC
     // video header tag
-    if (has_video) {
+    if (has_video && codec_ctx->avc_header) {
         if ( stream->avc_conf_tag == NULL)
             stream->avc_conf_tag = ngx_http_flv_base_alloc_tag_mem(stream->tag_buf_len);
         
@@ -620,6 +629,8 @@ ngx_http_flv_perpare_header(ngx_rtmp_session_t *session, void *ctx, ngx_rtmp_hea
         h->type = NGX_RTMP_MSG_VIDEO;
         if (ngx_http_flv_prepare_message(h, codec_ctx->avc_header, stream->avc_conf_tag, &stream->avc_tag_size) == NGX_ERROR)
             return NGX_ERROR;
+        
+        stream->avc_tag_pts = h->timestamp;
     }
 
     h->type = hhh_type;

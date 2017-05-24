@@ -296,6 +296,7 @@ typedef struct {
     ngx_uint_t              lsend_video_frame; 
     ngx_uint_t              lsend_video_size;
     ngx_uint_t              lsend_audio_size;
+    ngx_uint_t              dropVideoFrame;   // 丢帧数量            
     // end 日志相关
 
     ngx_chain_t            *out[0];
@@ -366,6 +367,7 @@ typedef struct ngx_rtmp_core_srv_conf_s {
 
     ngx_log_t               *error_log;
     ngx_log_t               *rtmp_log;
+    ngx_msec_t               rtmp_log_poll;
 } ngx_rtmp_core_srv_conf_t;
 
 
@@ -407,6 +409,7 @@ typedef struct {
 
 // ngx_uint_t                              global_log;
 ngx_log_t                              *global_log;
+ngx_msec_t                              global_poll;
 
 #define NGX_RTMP_MAIN_CONF_OFFSET  offsetof(ngx_rtmp_conf_ctx_t, main_conf)
 #define NGX_RTMP_SRV_CONF_OFFSET   offsetof(ngx_rtmp_conf_ctx_t, srv_conf)

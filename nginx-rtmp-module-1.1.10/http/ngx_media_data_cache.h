@@ -42,7 +42,7 @@ ngx_chain_t* ngx_media_data_cache_write(ngx_rtmp_session_t* s, ngx_rtmp_header_t
                                         ngx_rtmp_header_t *lh,ngx_int_t type);
 
 ngx_int_t 
-ngx_media_data_cache_send(ngx_rtmp_session_t *s, void *ctx, ngx_int_t type);
+ngx_media_data_cache_send(ngx_rtmp_session_t *s, void *ctx, ngx_int_t type,ngx_int_t only_send_header);
 
 ngx_int_t ngx_media_data_cahce_clear(ngx_rtmp_session_t* s,ngx_int_t type);
 
@@ -50,4 +50,6 @@ ngx_int_t ngx_http_flv_send_header(ngx_rtmp_session_t* s,void* pctx);
 
 //判断冷热流
 ngx_int_t ngx_rtmp_check_up_idle_stream(ngx_rtmp_session_t *s,int type);
+
+ngx_int_t ngx_http_check_tag_pts(ngx_chain_t* in,unsigned int tagpts,unsigned int cspts,int delta);
 #endif
