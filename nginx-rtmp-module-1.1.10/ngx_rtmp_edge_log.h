@@ -73,6 +73,9 @@ enum ngx_status_code {
     ngx_http_relay_send_chain_err = 54,
     ngx_http_relay_send_write_err = 55,
     ngx_http_relay_play_close   = 56,
+    ngx_http_cut_play_by_drop = 57,
+    ngx_http_cut_by_cache_full = 58,
+    ngx_http_send_http_header_error  = 59,
 
     ngx_rtmp_status_code_count
 };

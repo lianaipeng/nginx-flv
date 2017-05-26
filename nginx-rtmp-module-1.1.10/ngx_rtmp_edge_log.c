@@ -172,7 +172,7 @@ ngx_rtmp_edge_log(ngx_uint_t proType, ngx_uint_t logType, void *ss, ngx_uint_t c
                 }
                 ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, pr->uuid, 
                         &pr->client_ip, &pr->server_ip, &pr->host, &pr->stream, 
-                        ngx_edge_type[proType], pr->drop_vframe_num, pr->drop_vduration);
+                        ngx_edge_type[proType], pr->cache_frame_num, pr->cache_time_duration);
                 printf("####################### NGX_EDGE_BUFFER_START LOG\n");
             } else {
                 return;

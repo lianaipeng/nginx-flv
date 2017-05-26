@@ -50,6 +50,8 @@ typedef struct {
     ngx_flag_t http_play_cache_on;  //播放缓存开启标记
     ngx_uint_t http_play_cahce_frame_num; //播放最大缓存的帧大小
     ngx_msec_t http_play_cahce_time_duration; //播放最大缓存的时间长度
+
+    ngx_uint_t cut_play_before_drop_num;  //出现丢包几次后关闭掉链接
 }ngx_http_live_play_loc_conf_t;
 
 typedef struct {
@@ -101,7 +103,7 @@ typedef struct {
     ngx_http_flv_frame_t            *frame_chain_tail; //内容数据，发送就从次链表拿数据发送
 
     ngx_http_flv_frame_t            *frame_free;
-
+    ngx_int_t                       drop_count;
     ngx_msec_t                      cache_time_duration; //当前缓存时间长度
     ngx_uint_t                      cache_frame_num; //当前缓存的视频帧数
     ngx_int_t                       cache_droping;   //丢帧标记

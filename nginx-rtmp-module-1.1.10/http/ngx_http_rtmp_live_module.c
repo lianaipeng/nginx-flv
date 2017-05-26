@@ -560,6 +560,7 @@ ngx_http_rtmp_live_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *
             for (pctx = hr_ctx->stream->ctx; pctx; pctx = pctx->next) {
                 if (pctx->publishing == 0) {
                     http_ctx = pctx->http_ctx;
+                    http_ctx->status_code = ngx_rtmp_live_idle_publisher;
                     ngx_http_live_play_close(http_ctx);
                 }
             }
