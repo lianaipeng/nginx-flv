@@ -348,6 +348,10 @@ typedef struct ngx_rtmp_core_srv_conf_s {
     ngx_flag_t              so_keepalive;
     ngx_int_t               max_streams;
 
+    ngx_flag_t              sock_opt_on;
+    ngx_int_t               send_buf_size;
+    ngx_int_t               recv_buf_size;
+
     ngx_uint_t              ack_window;
 
     ngx_int_t               chunk_size;

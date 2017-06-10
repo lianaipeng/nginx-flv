@@ -515,7 +515,7 @@ ngx_http_live_play_recv_handler(ngx_event_t *ev)
 
     ngx_int_t n;
 
-    u_char buf[512];
+    u_char buf[1024] = {0};
     while (1) {
         n = c->recv(c, buf, sizeof(buf));
         if (n == NGX_ERROR || n == 0) {
@@ -533,6 +533,9 @@ ngx_http_live_play_recv_handler(ngx_event_t *ev)
         }
         if (n < 0)
             break;
+
+        if(n > 0)//暂时不处理
+            return ;
     }
     ngx_http_request_t *  r = (ngx_http_request_t * )c->data;
 
@@ -573,6 +576,7 @@ ngx_http_live_play_write_handler(ngx_event_t *ev)
     if (ev->timer_set) {
         ngx_del_timer(ev);
     }
+
     if (hctx->frame_chain_head) {
         // 取一帧发送
         ngx_http_flv_frame_t *frame = hctx->frame_chain_head;
@@ -584,12 +588,12 @@ ngx_http_live_play_write_handler(ngx_event_t *ev)
             while (send_len > 0) {
                 ngx_int_t send_one_len = hlplc->http_send_chunk_size > send_len ? send_len : hlplc->http_send_chunk_size;
                 n = c->send(c, frame->out->buf->pos,send_one_len); 
-
+                
                 if (n == NGX_AGAIN || n == 0 
                         || (n < send_one_len && n > 0 )
                         || hctx->current_send_count > hlplc->http_send_max_chunk_count ) {
                     hctx->current_send_count  = 0;
-                    
+                    printf("send full %ld\n",n);
                     if(n > 0 &&  n <= send_one_len)
                         frame->out->buf->pos += n;
 
@@ -623,7 +627,18 @@ ngx_http_live_play_write_handler(ngx_event_t *ev)
             {
                 hctx->cache_frame_num--;
                 hctx->cache_time_duration -= frame->mdelte;
+                hctx->video_pts = frame->mpts;
+                hctx->recv_video_size += frame->mlen;
+                if(hctx->first_tag && frame->mtype == HTTP_FLV_VIDEO_KEY_FRAME_TAG){
+                    hctx->first_tag = 0;
+                    hctx->system_first_pts = hctx->current_ts;
+                    hctx->data_first_pts = frame->mpts;
+                }
+            }else{
+                hctx->audio_pts = frame->mpts;
+                hctx->recv_audio_size += frame->mlen;
             }
+             hctx->recv_video_frame += 1;
 
             ngx_http_flv_free_tag_mem(frame->out);
             frame->out = NULL;
@@ -708,10 +723,10 @@ static ngx_int_t
 ngx_http_live_paly_join(ngx_http_live_play_request_ctx_t *r)
 {
     ngx_int_t rc = ngx_http_rtmp_live_play((void*)r);
-    if (rc == NGX_STREAM_BACK_CC) {
-         rc = ngx_http_get_relay_status((void*)r);
-         if (rc == NGX_OK)
-            return NGX_STREAM_BACK_CC;   
+    if (rc != NGX_ERROR) {
+         ngx_int_t rewrite_rc = ngx_http_get_relay_status((void*)r);
+         if (rewrite_rc != NGX_OK)
+            rc = rewrite_rc;
     }
     return rc;
 }
@@ -813,7 +828,12 @@ ngx_http_live_play_handler(ngx_http_request_t * r)
     pr->header_chain = (ngx_chain_t*)ngx_pcalloc(r->pool,sizeof(ngx_chain_t));
     pr->s = r;
     pr->send_header_flag  = 0;
-
+    pr->cache_time_duration = 0;
+    pr->cache_max_duration = 0;
+    pr->first_tag = 1;
+    pr->system_first_pts = 0;
+    pr->data_first_pts = 0;
+    memset(pr->client_isp_name,0,1024);
     // 初始化打印日志相关参数
     ngx_http_live_play_init_log(pr);
     
@@ -861,8 +881,7 @@ ngx_http_live_play_handler(ngx_http_request_t * r)
                        r->status_code = ngx_http_live_stream_rewait_err; 
                        ngx_http_live_play_close_request(r);
                        return NGX_OK;
-                  }
-                  else{
+                  }else{
                       ngx_http_live_play_respond_header(pr,HTTP_STATUS_404,"Video/x-flv",NULL);
                       r->status_code = ngx_http_live_not_allowed; 
                       ngx_http_live_play_close_request(r);
@@ -992,7 +1011,6 @@ ngx_http_live_send_message(ngx_http_live_play_request_ctx_t *pr, ngx_chain_t* ou
     // 打印日志
     //判断是否还能处理数据
     if(ngx_http_paly_cache_process(pr, mtype) !=  NGX_OK) {
-        //printf("dorp frame  %c  len %d pts %d caton:%ld\n",mtype,mlen,pts, pr->start_caton);
         if(mtype >= HTTP_FLV_VIDEO_TAG) {
             pr->drop_vduration += delta;
             pr->drop_vframe_num++;
@@ -1010,7 +1028,6 @@ ngx_http_live_send_message(ngx_http_live_play_request_ctx_t *pr, ngx_chain_t* ou
                 ngx_http_live_play_close(pr);
                 return NGX_ERROR;
             }
-            printf("############## NGX_EDGE_BUFFER_START\n");
             ngx_rtmp_edge_log(NGX_EDGE_HTTP, NGX_EDGE_BUFFER_START, pr, pr->current_ts);
             pr->start_caton = 1;
         }
@@ -1019,7 +1036,11 @@ ngx_http_live_send_message(ngx_http_live_play_request_ctx_t *pr, ngx_chain_t* ou
         if(mtype >= HTTP_FLV_VIDEO_TAG) {
             pr->cache_frame_num++;
             pr->cache_time_duration += delta;
-
+            if(pr->cache_max_duration < pr->cache_time_duration && delta < 2000)
+            {
+                pr->cache_max_duration  = pr->cache_time_duration;
+            }
+            
             if (mtype == HTTP_FLV_VIDEO_TAG && pr->start_caton == 1) {
                 ngx_rtmp_edge_log(NGX_EDGE_HTTP, NGX_EDGE_BUFFER_STOP, pr, pr->current_ts);     
                 pr->drop_vduration = 0;
@@ -1054,23 +1075,13 @@ ngx_http_live_send_message(ngx_http_live_play_request_ctx_t *pr, ngx_chain_t* ou
         ngx_http_live_play_write_handler(pr->s->connection->write);
     }
     
-    // 日志相关 
-    if (mtype == HTTP_FLV_VIDEO_TAG) {
-        pr->recv_video_size += mlen;
-    } else if (mtype == HTTP_FLV_AUDIO_TAG) {
-        pr->recv_audio_size += mlen;
-    }
-    pr->recv_video_frame += 1;
-
+    pr->stream_ts = pts;
     if (pr->current_ts-pr->log_lts >= global_poll) {
         if (pr->log_type == 0) { 
             ngx_rtmp_edge_log(NGX_EDGE_HTTP, NGX_EDGE_PULL_START, pr, pr->current_ts);
             pr->log_type = 1;
         } else {
-            pr->stream_ts = pts;
-            pr->delta = delta;
             ngx_rtmp_edge_log(NGX_EDGE_HTTP, NGX_EDGE_PULL_WATCH, pr, pr->current_ts);
-
             pr->lrecv_video_size = pr->recv_video_size;
             pr->lrecv_audio_size = pr->recv_audio_size;
             pr->lrecv_video_frame = pr->recv_video_frame;
@@ -1146,7 +1157,6 @@ ngx_http_live_play_send_http_header(void* ptr)
 {
     if(ptr == NULL)
         return NGX_ERROR;
-    printf("ngx_http_live_play_send_http_header\n");
     ngx_http_live_play_request_ctx_t *  hctx = (ngx_http_live_play_request_ctx_t*)ptr;
     ngx_int_t rc = 0;
     ngx_http_live_play_loc_conf_t* lacf = NULL;
@@ -1187,6 +1197,7 @@ ngx_http_live_play_send_http_header(void* ptr)
                 if (hctx->relay_ctx->http_pull_url.len > 0) {
                     ngx_str_format_string(hctx->relay_ctx->http_pull_url,location);
                     status = HTTP_STATUS_302;
+                    hctx->s->status_code = ngx_http_live_status_302_err;
                 } else {
                     status = HTTP_STATUS_404;
                 }

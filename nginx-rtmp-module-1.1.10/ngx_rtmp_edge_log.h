@@ -98,7 +98,7 @@ enum ngx_rtmp_edge_protocol_type {
     NGX_EDGE_HTTP
 };
 
-#define NGX_PRINTF_LOG 1
+#define NGX_PRINTF_LOG 0
 
 
 void ngx_rtmp_edge_log(ngx_uint_t proType, ngx_uint_t logType, void *ss, ngx_uint_t current_ts);

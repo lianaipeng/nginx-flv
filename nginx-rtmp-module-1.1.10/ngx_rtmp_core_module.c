@@ -186,6 +186,27 @@ static ngx_command_t  ngx_rtmp_core_commands[] = {
       offsetof(ngx_rtmp_core_srv_conf_t, idle_up_stream_destory),
       NULL },
 
+    { ngx_string("sock_opt_on"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_RTMP_SRV_CONF_OFFSET,
+      offsetof(ngx_rtmp_core_srv_conf_t, sock_opt_on),
+      NULL },
+
+    { ngx_string("send_buf_size"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_num_slot,
+      NGX_RTMP_SRV_CONF_OFFSET,
+      offsetof(ngx_rtmp_core_srv_conf_t, send_buf_size),
+      NULL },
+
+    { ngx_string("recv_buf_size"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_num_slot,
+      NGX_RTMP_SRV_CONF_OFFSET,
+      offsetof(ngx_rtmp_core_srv_conf_t, recv_buf_size),
+      NULL },
+
       ngx_null_command
 };
 
@@ -278,8 +299,10 @@ ngx_rtmp_core_create_srv_conf(ngx_conf_t *cf)
     conf->buflen = NGX_CONF_UNSET_MSEC;
     conf->busy = NGX_CONF_UNSET;
     conf->idle_up_stream_destory = NGX_CONF_UNSET_MSEC;
-
+    conf->send_buf_size = NGX_CONF_UNSET;
+    conf->recv_buf_size = NGX_CONF_UNSET;
     conf->rtmp_log_poll = NGX_CONF_UNSET_MSEC;
+    conf->sock_opt_on = NGX_CONF_UNSET;
 
     return conf;
 }
@@ -297,6 +320,11 @@ ngx_rtmp_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_value(conf->so_keepalive, prev->so_keepalive, 0);
     ngx_conf_merge_value(conf->max_streams, prev->max_streams, 32);
+
+    ngx_conf_merge_value(conf->recv_buf_size, prev->recv_buf_size, 65536);
+    ngx_conf_merge_value(conf->send_buf_size, prev->send_buf_size, 65536);
+
+    ngx_conf_merge_value(conf->max_streams, prev->max_streams, 32);
     ngx_conf_merge_value(conf->chunk_size, prev->chunk_size, 4096);
     ngx_conf_merge_uint_value(conf->ack_window, prev->ack_window, 5000000);
     ngx_conf_merge_size_value(conf->max_message, prev->max_message,
@@ -308,6 +336,8 @@ ngx_rtmp_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->publish_time_fix, prev->publish_time_fix, 1);
     ngx_conf_merge_msec_value(conf->buflen, prev->buflen, 1000);
     ngx_conf_merge_value(conf->busy, prev->busy, 0);
+    ngx_conf_merge_value(conf->sock_opt_on, prev->sock_opt_on, 0);
+    
     ngx_conf_merge_msec_value(conf->idle_up_stream_destory, prev->idle_up_stream_destory, 30000);
     if (prev->pool == NULL) {
         prev->pool = ngx_create_pool(4096, &cf->cycle->new_log);

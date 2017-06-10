@@ -51,5 +51,5 @@ ngx_int_t ngx_http_flv_send_header(ngx_rtmp_session_t* s,void* pctx);
 //判断冷热流
 ngx_int_t ngx_rtmp_check_up_idle_stream(ngx_rtmp_session_t *s,int type);
 
-ngx_int_t ngx_http_check_tag_pts(ngx_chain_t* in,unsigned int tagpts,unsigned int cspts,int delta);
+unsigned int ngx_http_check_tag_pts(ngx_chain_t* in,unsigned int tagpts,unsigned int cspts,int delta);
 #endif

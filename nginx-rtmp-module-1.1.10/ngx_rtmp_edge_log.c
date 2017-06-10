@@ -38,7 +38,7 @@ ngx_rtmp_edge_log(ngx_uint_t proType, ngx_uint_t logType, void *ss, ngx_uint_t c
     
     switch (logType) {
         case NGX_EDGE_PULL_START:
-            szformat = "EDGE{\"_type\":\"v2.edgePullStart\",\"timestamp\":%l,\"session\":\"%s\",\"clientIP\":\"%V\",\"serverIP\":\"%V\",\"host\":\"%V\",\"name\":\"%V\",\"protocolType\":\"%s\",\"body\":{\"responseTime\":%l,\"pullUrl\":\"%V\"}}EDGE";
+            szformat = "EDGE{\"_type\":\"v2.edgePullStart\",\"timestamp\":%l,\"session\":\"%s\",\"clientIP\":\"%V\",\"serverIP\":\"%V\",\"host\":\"%V\",\"name\":\"%V\",\"protocolType\":\"%s\",\"body\":{\"responseTime\":%l,\"pullUrl\":\"%V\",\"pts\":%l}}EDGE";
             if (proType == NGX_EDGE_RTMP) {
                 s = (ngx_rtmp_session_t *)ss;
                 if ( global_log == NULL && s->connection && s->connection->log) {
@@ -46,7 +46,7 @@ ngx_rtmp_edge_log(ngx_uint_t proType, ngx_uint_t logType, void *ss, ngx_uint_t c
                 }
                 ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, &s->uuid, 
                         &s->client_ip, &s->server_ip, &s->host, &s->name, 
-                        ngx_edge_type[proType], 0, &s->pull_url);
+                        ngx_edge_type[proType], 0, &s->pull_url,0);
             } else if ( proType == NGX_EDGE_HTTP ){
                 pr = (ngx_http_live_play_request_ctx_t *)ss;
                 if ( global_log == NULL && pr->s && pr->s->connection && pr->s->connection->log) {
@@ -54,13 +54,13 @@ ngx_rtmp_edge_log(ngx_uint_t proType, ngx_uint_t logType, void *ss, ngx_uint_t c
                 }
                 ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, pr->uuid, 
                         &pr->client_ip, &pr->server_ip, &pr->host, &pr->stream, 
-                        ngx_edge_type[proType], pr->current_ts-pr->request_ts, &pr->pull_url);
+                        ngx_edge_type[proType], pr->current_ts-pr->request_ts, &pr->pull_url,pr->stream_ts);
             } else { 
                 return;
             } 
             break;
         case NGX_EDGE_PULL_WATCH:
-            szformat = "EDGE{\"_type\":\"v2.edgePullWatch\",\"timestamp\":%l,\"session\":\"%s\",\"clientIP\":\"%V\",\"serverIP\":\"%V\",\"host\":\"%V\",\"name\":\"%V\",\"protocolType\":\"%s\",\"body\":{\"pullUrl\":\"%V\",\"pts\":%l,\"videoSize\":%l,\"audioSize\":%l,\"delay\":%l,\"sendFrame\":%l,\"dropVideoFrame\":%l,\"cacheVideoFrame\":%l}}EDGE";
+            szformat = "EDGE{\"_type\":\"v2.edgePullWatch\",\"timestamp\":%l,\"session\":\"%s\",\"clientIP\":\"%V\",\"serverIP\":\"%V\",\"host\":\"%V\",\"name\":\"%V\",\"protocolType\":\"%s\",\"body\":{\"pullUrl\":\"%V\",\"pts\":%l,\"videoSize\":%l,\"audioSize\":%l,\"delay\":%l,\"sendFrame\":%l,\"dropVideoFrame\":%l,\"cacheVideoFrame\":%l,\"cacheMaxDuration\":%l,\"delay_AV\":%l,\"sysDuration\":%l,\"dataDuration\":%l}}EDGE";
             if (proType == NGX_EDGE_RTMP) {
                 s = (ngx_rtmp_session_t *)ss;
                 if ( global_log == NULL && s->connection && s->connection->log ) {
@@ -71,7 +71,7 @@ ngx_rtmp_edge_log(ngx_uint_t proType, ngx_uint_t logType, void *ss, ngx_uint_t c
                         ngx_edge_type[proType], &s->pull_url, s->stream_ts,   
                         s->recv_video_size - s->lrecv_video_size, 
                         s->recv_audio_size - s->lrecv_audio_size, s->delta, 
-                        s->recv_video_frame - s->lrecv_video_frame, 0, 0);
+                        s->recv_video_frame - s->lrecv_video_frame, 0,0,0,0,0,0);
             } else if (proType == NGX_EDGE_HTTP ) {
                 pr = (ngx_http_live_play_request_ctx_t *)ss;
                 if ( global_log == NULL && pr->s && pr->s->connection && pr->s->connection->log) {
@@ -81,15 +81,16 @@ ngx_rtmp_edge_log(ngx_uint_t proType, ngx_uint_t logType, void *ss, ngx_uint_t c
                         &pr->client_ip, &pr->server_ip, &pr->host, &pr->stream, 
                         ngx_edge_type[proType], &pr->pull_url, pr->stream_ts, 
                         pr->recv_video_size - pr->lrecv_video_size, 
-                        pr->recv_audio_size - pr->lrecv_audio_size, pr->delta, 
+                        pr->recv_audio_size - pr->lrecv_audio_size, pr->cache_time_duration, 
                         pr->recv_video_frame - pr->lrecv_video_frame, 
-                        pr->dropVideoFrame, pr->cacheVideoFrame);
+                        pr->dropVideoFrame, pr->cacheVideoFrame,pr->cache_max_duration,pr->audio_pts - pr->video_pts
+                        ,pr->current_ts - pr->system_first_pts,pr->stream_ts-pr->data_first_pts);
             } else {
                 return;
             } 
             break;
         case NGX_EDGE_PULL_STOP:
-            szformat = "EDGE{\"_type\":\"v2.edgePullStop\",\"timestamp\":%l,\"session\":\"%s\",\"clientIP\":\"%V\",\"serverIP\":\"%V\",\"host\":\"%V\",\"name\":\"%V\",\"protocolType\":\"%s\",\"body\":{\"pullUrl\":\"%V\",\"duration\":%l,\"statusCode\":%l,\"videoSize\":%l,\"audioSize\":%l,\"allDropFrame\":%l}}EDGE";
+            szformat = "EDGE{\"_type\":\"v2.edgePullStop\",\"timestamp\":%l,\"session\":\"%s\",\"clientIP\":\"%V\",\"serverIP\":\"%V\",\"host\":\"%V\",\"name\":\"%V\",\"protocolType\":\"%s\",\"body\":{\"pullUrl\":\"%V\",\"duration\":%l,\"statusCode\":%l,\"videoSize\":%l,\"audioSize\":%l,\"allDropFrame\":%l,\"cacheMaxDuration\":%l}}EDGE";
             if (proType == NGX_EDGE_RTMP) {
                 s = (ngx_rtmp_session_t *)ss;
                 if ( global_log == NULL && s->connection && s->connection->log ) {
@@ -108,7 +109,7 @@ ngx_rtmp_edge_log(ngx_uint_t proType, ngx_uint_t logType, void *ss, ngx_uint_t c
                         &pr->client_ip, &pr->server_ip, &pr->host, &pr->stream, 
                         ngx_edge_type[proType], &pr->pull_url, pr->current_ts-pr->request_ts, 
                         pr->status_code, pr->recv_video_size, 
-                        pr->recv_audio_size, pr->dropVideoFrame);
+                        pr->recv_audio_size, pr->dropVideoFrame,pr->cache_max_duration);
             } else {
                 return;
             }
@@ -173,7 +174,6 @@ ngx_rtmp_edge_log(ngx_uint_t proType, ngx_uint_t logType, void *ss, ngx_uint_t c
                 ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, pr->uuid, 
                         &pr->client_ip, &pr->server_ip, &pr->host, &pr->stream, 
                         ngx_edge_type[proType], pr->cache_frame_num, pr->cache_time_duration);
-                printf("####################### NGX_EDGE_BUFFER_START LOG\n");
             } else {
                 return;
             }

@@ -3,6 +3,7 @@
 #include "ngx_http_rtmp_relay.h"
 #include <ngx_md5.h>
 #include "ngx_rtmp_edge_log.h"
+#include "ngx_ipip.h"
 
 char *
 ngx_http_live_get_str_data(ngx_str_t *str);
@@ -89,6 +90,19 @@ static ngx_command_t  ngx_http_live_play_relay_commands[] = {
         offsetof(ngx_http_live_play_relay_loc_conf_t, reconnect_count_before_302),
         NULL },
 
+    { ngx_string("ip_file_path"),
+        NGX_HTTP_LOC_CONF |NGX_CONF_FLAG,
+        ngx_conf_set_str_slot,
+        NGX_HTTP_LOC_CONF_OFFSET,
+        offsetof(ngx_http_live_play_relay_loc_conf_t,ip_file_path), 
+        NULL },
+     {ngx_string("check_ip"),
+        NGX_HTTP_LOC_CONF | NGX_CONF_TAKE1,
+        ngx_conf_set_flag_slot,
+        NGX_HTTP_LOC_CONF_OFFSET,
+        offsetof(ngx_http_live_play_relay_loc_conf_t,check_ip), 
+        NULL},
+
     ngx_null_command
 };
 
@@ -166,6 +180,7 @@ static void *ngx_http_live_play_relay_create_loc_conf(ngx_conf_t *cf)
     nacf->pool = NGX_CONF_UNSET_PTR;
     nacf->rtmp_server_port = NGX_CONF_UNSET_UINT;
     nacf->reconnect_count_before_302 = NGX_CONF_UNSET_UINT;
+    nacf->check_ip = NGX_CONF_UNSET;
     return nacf;
 }
 
@@ -188,6 +203,9 @@ static char *ngx_http_live_play_relay_merge_loc_conf(ngx_conf_t *cf, void *paren
     ngx_conf_merge_uint_value(conf->reconnect_count_before_302,prev->reconnect_count_before_302,3);
     ngx_conf_merge_str_value(conf->http_back_source_addr_param_name,prev->http_back_source_addr_param_name,"http_source");
     ngx_conf_merge_str_value(conf->rtmp_back_source_addr_param_name,prev->rtmp_back_source_addr_param_name,"rtmp_source");
+    ngx_conf_merge_str_value(conf->ip_file_path,prev->ip_file_path,"");
+    ngx_conf_merge_value(conf->check_ip, prev->check_ip, 0);
+
     if (conf->http_on_play.len > 0) {
         prev->active = conf->active = 1;
         conf->url = ngx_http_live_play_relay_notify_parse_url(cf->pool,&conf->http_on_play);
@@ -1078,7 +1096,7 @@ ngx_int_t ngx_http_live_relay_on_play(void * ptr)
     
     ngx_http_live_play_relay_loc_conf_t* hrlc;
     hrlc = (ngx_http_live_play_relay_loc_conf_t*)ngx_http_get_module_loc_conf(rc->s,ngx_http_live_play_relay_module);
-    if(hrlc == NULL || !hrlc->active || hrlc->http_on_play.len <= 4)
+    if(hrlc == NULL || !hrlc->active)
         return NGX_ERROR;
     
     if(rc->relay_ctx == NULL){
@@ -1094,12 +1112,12 @@ ngx_int_t ngx_http_live_relay_on_play(void * ptr)
         return NGX_ERROR;
 
     ngx_http_set_ctx(rc->s, rc->relay_ctx, ngx_http_live_play_relay_module);
-    if(ngx_parse_args_list_have_source_addr(rc) == NGX_OK) //判断参数中是否有回源地址,如果有就不需要再调用接口获取回源地址
+    if(ngx_parse_args_list_have_source_addr(rc) == NGX_OK)
     {
         ngx_printf_log("ngx_http_live_play_relay_module","ngx_http_live_relay_on_play","ngx_parse_args_list_have_source_addr");
         return ngx_http_trigger_rtmp_relay_pull((void*)rc->s);
     }
-    else
+    else 
     {
         // rc->relay_ctx->refcount++;
         ngx_memzero(&ci, sizeof(ci));
@@ -1161,12 +1179,24 @@ ngx_int_t ngx_http_get_relay_status(void* v)
      {
         ngx_http_live_play_relay_ctx_t *  hrctx = (ngx_http_live_play_relay_ctx_t*)rctx->relay_ctx;
         ngx_int_t count = hrlc->reconnect_count_before_302;
-        // if(hrctx->reconnect_count >= count ) //重连次数太多/302跳转
         if(hrctx->reconnect_count >= count || hrctx->errcount >= count ) //重连次数太多/302跳转
             return NGX_STREAM_REWART;
+
         if(hrctx->rtmp_pull_url.len <= 7 && hrctx->http_pull_url.len > 7)
-            return NGX_STREAM_REWART;   
-            
+            return NGX_STREAM_REWART; 
+
+        if(hrlc->check_ip)
+        {
+            char ip[64] = {'\0'};
+            char file[1024] = {'\0'};
+            ngx_str_format_string(rctx->client_ip,ip);
+            ngx_str_format_string(hrlc->ip_file_path,file);
+            if(check_ip_allow(ip,"湖北_电信",file,rctx->client_isp_name) == 0)
+            {
+                if( hrctx->http_pull_url.len > 7)
+                    return NGX_STREAM_REWART;
+            }
+        }
         return NGX_OK;
      }
      return NGX_ERROR;

@@ -3,6 +3,11 @@
 日志上报部分：
 REPORT_POLL     日志上报频率
 LOF_FILE        日志文件路径
+RESEND_COUNT    http 请求超时重发次数
+OFFSET_FILE     上次读取文件的便移量
+MAX_LINE_COUNT  一次最大发送watch数据
+API_URL         API接口地址
+注意：rtmp_log日志切分的时候，需要删除OFFSET_FILE（置空便移量）
 
 HTTP 部分：
 配置名称                      作用域            值                         描述  

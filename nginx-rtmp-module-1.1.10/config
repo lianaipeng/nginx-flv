@@ -60,6 +60,7 @@ RTMP_DEPS="                                                 \
                 $ngx_addon_dir/http/ngx_http_rtmp_live_module.h   \
                 $ngx_addon_dir/http/ngx_http_play_scheduler.h     \
                 $ngx_addon_dir/ngx_rtmp_edge_log.h         \
+                $ngx_addon_dir/http/ngx_ipip.h         \
                 "
 
 
@@ -98,6 +99,7 @@ RTMP_CORE_SRCS="                                            \
                 $ngx_addon_dir/dash/ngx_rtmp_mp4.c          \
                 $ngx_addon_dir/http/ngx_http_rtmp_live_module.c          \
                 $ngx_addon_dir/ngx_rtmp_edge_log.c         \
+                $ngx_addon_dir/http/ngx_ipip.c         \
                 "
 
 

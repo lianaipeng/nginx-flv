@@ -107,6 +107,7 @@ typedef struct {
     ngx_msec_t                      cache_time_duration; //当前缓存时间长度
     ngx_uint_t                      cache_frame_num; //当前缓存的视频帧数
     ngx_int_t                       cache_droping;   //丢帧标记
+    ngx_uint_t                      cache_max_duration; //最大缓存时间
 
     ngx_int_t                       drop_vframe_num;  //丢弃的视频帧数
     ngx_int_t                       drop_vduration;   //丢帧视频的时长
@@ -122,17 +123,24 @@ typedef struct {
     ngx_uint_t                       current_ts;    // 每次数据发送时间 
     ngx_str_t                        client_ip; 
     ngx_str_t                        server_ip;
+    char                             client_isp_name[1024];
     ngx_str_t                        host;
     ngx_str_t                        pull_url;
     
     ngx_uint_t                       stream_ts;
-    ngx_int_t                        delta;             //
     ngx_uint_t                       recv_video_size;
     ngx_uint_t                       recv_audio_size;
     ngx_uint_t                       recv_video_frame; 
     ngx_uint_t                       lrecv_video_size;
     ngx_uint_t                       lrecv_audio_size;
     ngx_uint_t                       lrecv_video_frame; 
+
+    ngx_int_t                       audio_pts;//音频时间戳
+    ngx_int_t                       video_pts;//视频时间戳  
+
+    ngx_int_t                       first_tag;
+    ngx_int_t                       system_first_pts; //收到第一帧数据的系统时间
+    ngx_int_t                       data_first_pts; //收到第一帧的数据时间 两个时间都采用视频做参考
     
     ngx_flag_t                       start_caton;    // 开始卡顿
     ngx_uint_t                       dropVideoFrame;

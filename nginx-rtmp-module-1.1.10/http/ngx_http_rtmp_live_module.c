@@ -248,16 +248,17 @@ ngx_http_rtmp_live_play(void *http_ctx)
             return NGX_ERROR;
         }
     } else if (rc == NGX_OK && hr_ctx->stream ) {
-        // hr_ctx->stream->relay_ctx = (void*)ctx->relay_ctx;
         ctx->relay_ctx = hr_ctx->stream->relay_ctx;
         if (ctx->relay_ctx) {
-            
-            if (ctx->relay_ctx->rtmp_pull_url.len <= 0 && ctx->relay_ctx->http_pull_url.len <= 0) {
+            if (ctx->relay_ctx->rtmp_pull_url.len <= 0 && ctx->relay_ctx->http_pull_url.len <= 0) {//表示需要回源
                 //在此触发回源 
-                if (ctx->relay_ctx->backing == 0) {
+                if (ctx->relay_ctx->backing == 0) { //都请求回源
                     if (ngx_http_live_relay_on_play((void*)ctx) != NGX_OK)
                         return NGX_ERROR;
                 }
+            }else{
+                if(hr_ctx->stream->streaming == 0 && hr_ctx->stream->publishing == 0 && ctx->relay_ctx->rctx == NULL) //表示没有上行推流
+                    ngx_http_trigger_rtmp_relay_pull(ctx->relay_ctx);
             }
         }
     } else {
@@ -340,9 +341,6 @@ ngx_http_rtmp_live_update_audio_av_header(ngx_rtmp_session_t *s, ngx_rtmp_header
 }
 
 
-// bool bIsFirst = true;
-FILE * fp = NULL;
-int  frame_num = 0;
 static ngx_int_t 
 ngx_http_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, ngx_chain_t *in)
 {
@@ -479,11 +477,9 @@ ngx_http_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, ngx_chain_t *
             if(ngx_media_data_cache_send(s,(void*)pctx,HTTP_FLV_PROTOCOL,only_send_header) != NGX_OK)
                 continue;
             pctx->meta_version = meta_version;
-        }
-        else {
-            ngx_http_check_tag_pts(rpkt,h->timestamp,cs->timestamp,delta);
-            ngx_http_live_send_message(req_ctx,rpkt,mtype,mlen,h->timestamp,delta);
-
+        }else {
+            unsigned int check_pts = ngx_http_check_tag_pts(rpkt,h->timestamp,cs->timestamp,delta);
+            ngx_http_live_send_message(req_ctx,rpkt,mtype,mlen,check_pts,delta);
             cs->timestamp += delta;
             req_ctx->current_time = cs->timestamp;
         }
@@ -545,6 +541,9 @@ ngx_http_rtmp_live_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *
     if (hr_ctx->stream->publishing && hr_ctx->publishing) {
         ngx_media_data_cahce_clear(s,HTTP_FLV_PROTOCOL);
         hr_ctx->stream->publishing = 0;
+        hr_ctx->stream->streaming = 0;
+
+        ngx_http_close_rtmp_relay_pull(hr_ctx->stream->relay_ctx);
     }
 
     for (cctx = &hr_ctx->stream->ctx; *cctx; cctx = &(*cctx)->next) {

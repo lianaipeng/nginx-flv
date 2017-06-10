@@ -485,14 +485,14 @@ ngx_http_flv_send_header(ngx_rtmp_session_t *s, void *ptr)
     }
     
     if (ctx->stream->meta_tag_size > 0){
-        rc = ngx_http_live_send_message(ss, ctx->stream->meta_conf_tag, HTTP_FLV_META_TAG , ctx->stream->aac_tag_size, 0, 0);
+        rc = ngx_http_live_send_message(ss, ctx->stream->meta_conf_tag, HTTP_FLV_META_TAG , ctx->stream->aac_tag_size, s->busy_time, 0);
         if (rc != NGX_OK) {
             return NGX_ERROR;
         }
     }
     
     if (!acs->active && ctx->stream->aac_tag_size > 0){
-        rc = ngx_http_live_send_message(ss, ctx->stream->aac_conf_tag, HTTP_FLV_AAC_TAG, ctx->stream->aac_tag_size, 0, 0);
+        rc = ngx_http_live_send_message(ss, ctx->stream->aac_conf_tag, HTTP_FLV_AAC_TAG, ctx->stream->aac_tag_size, s->busy_time, 0);
         if (rc != NGX_OK) {
             return NGX_ERROR;
         }
@@ -502,7 +502,7 @@ ngx_http_flv_send_header(ngx_rtmp_session_t *s, void *ptr)
     }
 
     if (!vcs->active && ctx->stream->avc_tag_size > 0){
-        rc = ngx_http_live_send_message(ss, ctx->stream->avc_conf_tag, HTTP_FLV_AVC_TAG, ctx->stream->avc_tag_size, 0, 0);
+        rc = ngx_http_live_send_message(ss, ctx->stream->avc_conf_tag, HTTP_FLV_AVC_TAG, ctx->stream->avc_tag_size,  s->busy_time, 0);
         if (rc != NGX_OK) {
             return NGX_ERROR;
         }
@@ -736,14 +736,16 @@ ngx_int_t ngx_rtmp_check_up_idle_stream(ngx_rtmp_session_t *s,int type)
     return NGX_OK;
 }
 
-ngx_int_t ngx_http_check_tag_pts(ngx_chain_t* in,unsigned int tagpts,unsigned int cspts,int delta)
+unsigned int ngx_http_check_tag_pts(ngx_chain_t* in,unsigned int tagpts,unsigned int cspts,int delta)
 {
+    unsigned int lpts = tagpts;
     if(cspts > tagpts)
     {
         if(delta < 0 )
             delta = 0;
         int_4 pts = cspts + delta;
         ngx_http_rewrite_tag_pts(pts,in);
+        lpts = pts;
     }
-    return NGX_OK;
+    return lpts;
 }

@@ -36,7 +36,11 @@ typedef struct {
     ngx_url_t                                   *url;
     ngx_log_t                                   *log;
     ngx_pool_t                                   *pool;   
-    ngx_uint_t                                   rtmp_server_port;          
+    ngx_uint_t                                   rtmp_server_port;   
+
+    ngx_flag_t                                  check_ip;  //IP 规则检测标志
+    ngx_str_t                                   ip_file_path ; //IP 库的路径   
+      
     ngx_http_live_play_relay_ctx_t              *free_ctx; 
 } ngx_http_live_play_relay_loc_conf_t;
 

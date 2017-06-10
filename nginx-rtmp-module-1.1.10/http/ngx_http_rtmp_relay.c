@@ -30,7 +30,8 @@ ngx_http_live_rtmp_relay_pull_reconnect(ngx_event_t *ev)
         return;
     }
 
-   t = racf->pushes.elts;
+    t = racf->pushes.elts;
+    //printf("ngx_http_live_rtmp_relay_pull_reconnect  %ld\n",racf->pushes.nelts);
     for (n = 0; n < racf->pushes.nelts; ++n, ++t) {
         target = *t;
 
@@ -294,15 +295,18 @@ ngx_int_t ngx_http_close_rtmp_relay_pull(void*v)
     ngx_printf_log("ngx_http_rtmp_relay","ngx_http_close_rtmp_relay_pull","begin");
     ngx_http_live_play_relay_ctx_t *relay_ctx = (ngx_http_live_play_relay_ctx_t*)v;
 
-    ngx_rtmp_relay_ctx_t  *ctx, **cctx;
+    //ngx_rtmp_relay_ctx_t  *ctx, **cctx;
     if( relay_ctx == NULL)
         return NGX_OK;
+    
+    //ctx = relay_ctx->rctx;
+    
+    relay_ctx->rctx = NULL;
 
-    ctx = relay_ctx->rctx;
-    if (ctx == NULL) {
+    /*if (ctx == NULL) {
         return NGX_OK;
     }
-    
+
     if (ctx->publish == NULL) {
         return NGX_OK;
     }
@@ -319,7 +323,7 @@ ngx_int_t ngx_http_close_rtmp_relay_pull(void*v)
         }
     }
     ctx->publish = NULL;
-    relay_ctx->rctx = NULL;
+    relay_ctx->rctx = NULL;*/
     return NGX_OK;
 }
 

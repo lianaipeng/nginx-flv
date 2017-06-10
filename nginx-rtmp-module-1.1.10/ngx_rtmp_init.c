@@ -36,7 +36,6 @@ ngx_rtmp_init_connection(ngx_connection_t *c)
     /* find the server configuration for the address:port */
 
     /* AF_INET only */
-
     port = c->listening->servers;
     unix_socket = 0;
 
@@ -181,6 +180,7 @@ ngx_rtmp_init_socket(ngx_rtmp_session_t *s)
     s->host.data = ngx_pcalloc(s->connection->pool, len+1);
     ngx_memzero(s->host.data, len+1);
     ngx_memcpy(s->host.data, host, len);
+
 }
 
 ngx_rtmp_session_t *
@@ -238,6 +238,26 @@ ngx_rtmp_init_session(ngx_connection_t *c, ngx_rtmp_addr_conf_t *addr_conf)
 
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
+    if(cscf && cscf->sock_opt_on){
+        int rcv_size = 0;    /* 接收缓冲区大小 */ 
+        int snd_size = 0;    /*发送缓冲区大小*/
+        socklen_t optlen;    /* 选项值长度 */ 
+        optlen = sizeof(rcv_size); 
+        int err = getsockopt(c->fd, SOL_SOCKET, SO_RCVBUF,&rcv_size, &optlen); 
+        if(err>=0){ 
+            if(cscf->recv_buf_size > rcv_size){
+                rcv_size = cscf->recv_buf_size;
+                setsockopt(c->fd, SOL_SOCKET, SO_RCVBUF,&rcv_size, optlen); 
+            }
+        }
+        err = getsockopt(c->fd, SOL_SOCKET, SO_SNDBUF,&snd_size, &optlen); 
+        if(err >= 0){
+             if(cscf->send_buf_size > rcv_size){
+                snd_size = cscf->send_buf_size;
+                setsockopt(c->fd, SOL_SOCKET, SO_SNDBUF,&snd_size, optlen); 
+            }
+        }
+    }
     /*
     // 重定向error_log
     ngx_rtmp_core_app_conf_t       *cacf;

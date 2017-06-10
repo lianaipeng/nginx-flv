@@ -673,7 +673,7 @@ ngx_configure_listening_sockets(ngx_cycle_t *cycle)
         }
 
         if (ls[i].sndbuf != -1) {
-            if (setsockopt(ls[i].fd, SOL_SOCKET, SO_SNDBUF,
+            if (setsockopt(ls[i].fd, SOL_SOCKET, SO_SNDBUF	,
                            (const void *) &ls[i].sndbuf, sizeof(int))
                 == -1)
             {
