@@ -339,7 +339,8 @@ ngx_http_parse_play_uri(ngx_str_t uri, ngx_http_live_play_request_ctx_t *pr, ngx
     if (hlplc->http_live_app.len > 0 && hlplc->http_live_app.data != NULL ) {
         pr->app = hlplc->http_live_app;
     }
-
+    if(pr->stream.len <= 0 ||  pr->suffix.len <= 0)
+        return NGX_ERROR;
     return NGX_OK;
 }
 
@@ -453,6 +454,7 @@ ngx_http_live_play_close_request(ngx_http_request_t * r)
     ngx_printf_log("ngx_http_live_play_module","ngx_http_live_play_close_request","close play");
     r->keepalive = 0;
 	ngx_http_finalize_request(r,NGX_DONE);
+    r->close_flag = 1;
 }
 
 static void 
@@ -746,6 +748,21 @@ ngx_http_live_play_init_log(ngx_http_live_play_request_ctx_t *pr)
     ngx_memzero(pr->uuid, 32);
     ngx_sprintf(pr->uuid, "%l_%d", pr->request_ts, r->connection->fd);
 
+    pr->server_ip.len = 0;
+    pr->server_ip.data = NULL;
+
+    pr->client_ip.len = 0; 
+    pr->client_ip.data = NULL;
+    
+    pr->host.len = 0;
+    pr->host.data = NULL;
+    /*
+    pr->name.len = 0;
+    pr->name.data = NULL;
+    */
+    pr->pull_url.len = 0;
+    pr->pull_url.data = NULL;
+
     // 获取client server ip
     struct sockaddr_in sa;
     int len = sizeof(sa);
@@ -814,18 +831,12 @@ ngx_http_live_play_handler(ngx_http_request_t * r)
     ngx_printf_log("ngx_http_live_play_module","ngx_http_live_play_handler","mothod %ld, uri %s, args %s",r->method,str,args);
 
     pr = (ngx_http_live_play_request_ctx_t*)ngx_pcalloc(r->pool,sizeof(ngx_http_live_play_request_ctx_t));
-    if (ngx_http_parse_play_uri(r->uri, pr, r) !=  NGX_OK) {
-        r->status_code = ngx_http_live_parse_play_uri_err; 
-        ngx_http_live_play_close_request(r);
+    if(pr == NULL)
         return NGX_ERROR;
-    }
-    if (ngx_parse_args(r, pr) != NGX_OK) {
-        r->status_code = ngx_http_live_parse_play_arg_err; 
-        ngx_http_live_play_close_request(r);
-        return NGX_ERROR;
-    }
-    
-    pr->header_chain = (ngx_chain_t*)ngx_pcalloc(r->pool,sizeof(ngx_chain_t));
+        
+    //clear memory
+    memset(pr,0,sizeof(ngx_http_live_play_request_ctx_t));
+
     pr->s = r;
     pr->send_header_flag  = 0;
     pr->cache_time_duration = 0;
@@ -836,6 +847,21 @@ ngx_http_live_play_handler(ngx_http_request_t * r)
     memset(pr->client_isp_name,0,1024);
     // 初始化打印日志相关参数
     ngx_http_live_play_init_log(pr);
+
+    ngx_http_set_ctx(r,pr,ngx_http_live_play_module);
+
+    if (ngx_http_parse_play_uri(r->uri, pr, r) !=  NGX_OK) {
+        r->status_code = ngx_http_request_uri_err;
+        ngx_http_live_play_close_request(r);
+        return NGX_ERROR;
+    }
+    if (ngx_parse_args(r, pr) != NGX_OK) {
+        r->status_code = ngx_http_request_param_err;
+        ngx_http_live_play_close_request(r);
+        return NGX_ERROR;
+    }
+    
+    pr->header_chain = (ngx_chain_t*)ngx_pcalloc(r->pool,sizeof(ngx_chain_t));
     
     
     // 纯粹为了打印
@@ -846,8 +872,6 @@ ngx_http_live_play_handler(ngx_http_request_t * r)
     ngx_str_format_string(pr->app,app);
     ngx_str_format_string(pr->stream,stream);
     ngx_str_format_string(pr->suffix,suffix);
-
-    ngx_http_set_ctx(r,pr,ngx_http_live_play_module);
 
     ngx_http_live_play_process_slot((u_char*)stream,strlen(stream));
 
@@ -896,7 +920,7 @@ ngx_http_live_play_handler(ngx_http_request_t * r)
         }else{
             if(ngx_http_live_play_respond_header(pr,HTTP_STATUS_200,"Video/x-flv",NULL) == NGX_ERROR)
             {
-                r->status_code = ngx_http_live_not_allowed; 
+                r->status_code = ngx_http_send_http_header_error; 
                 ngx_http_live_play_close_request(r);
 		        return NGX_HTTP_NOT_ALLOWED;
             }

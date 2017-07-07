@@ -44,17 +44,22 @@ ngx_rtmp_edge_log(ngx_uint_t proType, ngx_uint_t logType, void *ss, ngx_uint_t c
                 if ( global_log == NULL && s->connection && s->connection->log) {
                     global_log = s->connection->log;
                 }
-                ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, &s->uuid, 
-                        &s->client_ip, &s->server_ip, &s->host, &s->name, 
-                        ngx_edge_type[proType], 0, &s->pull_url,0);
+
+                if ( s->client_ip.len>0 && s->server_ip.len>0 && s->host.len>0 && s->name.len>0 && s->pull_url.len>0){
+                    ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, s->uuid, 
+                            &s->client_ip, &s->server_ip, &s->host, &s->name, 
+                            ngx_edge_type[proType], 0, &s->pull_url,0);
+                }
             } else if ( proType == NGX_EDGE_HTTP ){
                 pr = (ngx_http_live_play_request_ctx_t *)ss;
                 if ( global_log == NULL && pr->s && pr->s->connection && pr->s->connection->log) {
                     global_log = pr->s->connection->log;
                 }
-                ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, pr->uuid, 
-                        &pr->client_ip, &pr->server_ip, &pr->host, &pr->stream, 
-                        ngx_edge_type[proType], pr->current_ts-pr->request_ts, &pr->pull_url,pr->stream_ts);
+                if (pr->client_ip.len > 0 && pr->server_ip.len> 0  && pr->host.len>0 && pr->stream.len>0 && pr->pull_url.len>0) {
+                    ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, pr->uuid, 
+                            &pr->client_ip, &pr->server_ip, &pr->host, &pr->stream, 
+                            ngx_edge_type[proType], pr->current_ts-pr->request_ts, &pr->pull_url,pr->stream_ts);
+                }
             } else { 
                 return;
             } 
@@ -66,25 +71,29 @@ ngx_rtmp_edge_log(ngx_uint_t proType, ngx_uint_t logType, void *ss, ngx_uint_t c
                 if ( global_log == NULL && s->connection && s->connection->log ) {
                     global_log = s->connection->log;
                 }
-                ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, s->uuid, 
-                        &s->client_ip, &s->server_ip, &s->host, &s->name, 
-                        ngx_edge_type[proType], &s->pull_url, s->stream_ts,   
-                        s->recv_video_size - s->lrecv_video_size, 
-                        s->recv_audio_size - s->lrecv_audio_size, s->delta, 
-                        s->recv_video_frame - s->lrecv_video_frame, 0,0,0,0,0,0);
+                if (s->client_ip.len>0 && s->server_ip.len>0 && s->host.len>0 && s->name.len>0 && s->pull_url.len>0){
+                    ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, s->uuid, 
+                            &s->client_ip, &s->server_ip, &s->host, &s->name, 
+                            ngx_edge_type[proType], &s->pull_url, s->stream_ts,   
+                            s->recv_video_size - s->lrecv_video_size, 
+                            s->recv_audio_size - s->lrecv_audio_size, s->delta, 
+                            s->recv_video_frame - s->lrecv_video_frame, 0,0,0,0,0,0);
+                }
             } else if (proType == NGX_EDGE_HTTP ) {
                 pr = (ngx_http_live_play_request_ctx_t *)ss;
                 if ( global_log == NULL && pr->s && pr->s->connection && pr->s->connection->log) {
                     global_log = pr->s->connection->log;
                 }
-                ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, pr->uuid, 
-                        &pr->client_ip, &pr->server_ip, &pr->host, &pr->stream, 
-                        ngx_edge_type[proType], &pr->pull_url, pr->stream_ts, 
-                        pr->recv_video_size - pr->lrecv_video_size, 
-                        pr->recv_audio_size - pr->lrecv_audio_size, pr->cache_time_duration, 
-                        pr->recv_video_frame - pr->lrecv_video_frame, 
-                        pr->dropVideoFrame, pr->cacheVideoFrame,pr->cache_max_duration,pr->audio_pts - pr->video_pts
-                        ,pr->current_ts - pr->system_first_pts,pr->stream_ts-pr->data_first_pts);
+                if (pr->client_ip.len>0 && pr->server_ip.len>0 && pr->host.len>0 && pr->stream.len>0 && pr->pull_url.len>0) {
+                    ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, pr->uuid, 
+                            &pr->client_ip, &pr->server_ip, &pr->host, &pr->stream, 
+                            ngx_edge_type[proType], &pr->pull_url, pr->stream_ts, 
+                            pr->recv_video_size - pr->lrecv_video_size, 
+                            pr->recv_audio_size - pr->lrecv_audio_size, pr->cache_time_duration, 
+                            pr->recv_video_frame - pr->lrecv_video_frame, 
+                            pr->dropVideoFrame, pr->cacheVideoFrame,pr->cache_max_duration,pr->audio_pts - pr->video_pts
+                            ,pr->current_ts - pr->system_first_pts,pr->stream_ts-pr->data_first_pts);
+                }
             } else {
                 return;
             } 
@@ -96,20 +105,24 @@ ngx_rtmp_edge_log(ngx_uint_t proType, ngx_uint_t logType, void *ss, ngx_uint_t c
                 if ( global_log == NULL && s->connection && s->connection->log ) {
                     global_log = s->connection->log;
                 }
-                ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, s->uuid,
-                        &s->client_ip, &s->server_ip, &s->host, &s->name, 
-                        ngx_edge_type[proType], &s->pull_url, 0, 
-                        s->status_code, s->recv_video_size, s->recv_audio_size, s->dropVideoFrame);
+                if (s->client_ip.len>0 && s->server_ip.len>0 && s->host.len>0 && s->name.len>0 && s->pull_url.len>0){
+                    ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, s->uuid,
+                            &s->client_ip, &s->server_ip, &s->host, &s->name, 
+                            ngx_edge_type[proType], &s->pull_url, 0, 
+                            s->status_code, s->recv_video_size, s->recv_audio_size, s->dropVideoFrame);
+                }
             } else if (proType == NGX_EDGE_HTTP) {
                 pr = (ngx_http_live_play_request_ctx_t *)ss;
                 if ( global_log == NULL && pr->s && pr->s->connection && pr->s->connection->log) {
                     global_log = pr->s->connection->log;
                 }
-                ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, pr->uuid, 
-                        &pr->client_ip, &pr->server_ip, &pr->host, &pr->stream, 
-                        ngx_edge_type[proType], &pr->pull_url, pr->current_ts-pr->request_ts, 
-                        pr->status_code, pr->recv_video_size, 
-                        pr->recv_audio_size, pr->dropVideoFrame,pr->cache_max_duration);
+                if (pr->client_ip.len>0 && pr->server_ip.len>0 && pr->host.len>0 && pr->stream.len>0 && pr->pull_url.len>0) {
+                    ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, pr->uuid, 
+                            &pr->client_ip, &pr->server_ip, &pr->host, &pr->stream, 
+                            ngx_edge_type[proType], &pr->pull_url, pr->current_ts-pr->request_ts, 
+                            pr->status_code, pr->recv_video_size, 
+                            pr->recv_audio_size, pr->dropVideoFrame,pr->cache_max_duration);
+                }
             } else {
                 return;
             }
@@ -122,11 +135,13 @@ ngx_rtmp_edge_log(ngx_uint_t proType, ngx_uint_t logType, void *ss, ngx_uint_t c
                     global_log = s->connection->log;
                 }
                 codec = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
-                ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, s->uuid, 
-                        &s->client_ip, &s->server_ip, &s->host, &s->name, 
-                        ngx_edge_type[proType], current_ts, &s->pull_url, 
-                        codec->frame_rate, codec->video_data_rate, 
-                        codec->audio_channels, codec->sample_rate);
+                if (s->client_ip.len>0 && s->server_ip.len>0 && s->host.len>0 && s->name.len>0 && s->pull_url.len>0){
+                    ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, s->uuid, 
+                            &s->client_ip, &s->server_ip, &s->host, &s->name, 
+                            ngx_edge_type[proType], current_ts, &s->pull_url, 
+                            codec->frame_rate, codec->video_data_rate, 
+                            codec->audio_channels, codec->sample_rate);
+                }
             } else {
                 return;
             }
@@ -138,13 +153,15 @@ ngx_rtmp_edge_log(ngx_uint_t proType, ngx_uint_t logType, void *ss, ngx_uint_t c
                 if ( global_log == NULL && s->connection && s->connection->log ) {
                     global_log = s->connection->log;
                 }
-                ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, s->uuid, 
-                        &s->client_ip, &s->server_ip, &s->host, &s->name, ngx_edge_type[proType],
-                        s->recv_video_size - s->lrecv_video_size, 
-                        s->recv_audio_size - s->lrecv_audio_size, 
-                        s->recv_video_frame - s->lrecv_video_frame, 
-                        s->send_video_size - s->lsend_video_size, 
-                        s->send_audio_size - s->lsend_audio_size);
+                if (s->client_ip.len>0 && s->server_ip.len>0 && s->host.len>0 && s->name.len>0){
+                    ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, s->uuid, 
+                            &s->client_ip, &s->server_ip, &s->host, &s->name, ngx_edge_type[proType],
+                            s->recv_video_size - s->lrecv_video_size, 
+                            s->recv_audio_size - s->lrecv_audio_size, 
+                            s->recv_video_frame - s->lrecv_video_frame, 
+                            s->send_video_size - s->lsend_video_size, 
+                            s->send_audio_size - s->lsend_audio_size);
+                }
             } else {
                 return;
             }
@@ -156,10 +173,12 @@ ngx_rtmp_edge_log(ngx_uint_t proType, ngx_uint_t logType, void *ss, ngx_uint_t c
                 if ( global_log == NULL && s->connection && s->connection->log ) {
                     global_log = s->connection->log;
                 }
-                ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, s->uuid, 
-                        &s->client_ip, &s->server_ip, &s->host, &s->name, ngx_edge_type[proType], s->status_code, 
-                        s->recv_video_size, s->recv_audio_size, s->recv_video_frame, 
-                        s->send_video_size, s->send_audio_size);
+                if (s->client_ip.len>0 && s->server_ip.len>0 && s->host.len>0 && s->name.len>0){
+                    ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, s->uuid, 
+                            &s->client_ip, &s->server_ip, &s->host, &s->name, ngx_edge_type[proType], s->status_code, 
+                            s->recv_video_size, s->recv_audio_size, s->recv_video_frame, 
+                            s->send_video_size, s->send_audio_size);
+                }
             } else {
                 return;
             }
@@ -171,9 +190,11 @@ ngx_rtmp_edge_log(ngx_uint_t proType, ngx_uint_t logType, void *ss, ngx_uint_t c
                 if ( global_log == NULL && pr->s && pr->s->connection && pr->s->connection->log) {
                     global_log = pr->s->connection->log;
                 }
-                ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, pr->uuid, 
-                        &pr->client_ip, &pr->server_ip, &pr->host, &pr->stream, 
-                        ngx_edge_type[proType], pr->cache_frame_num, pr->cache_time_duration);
+                if (pr->client_ip.len>0 && pr->server_ip.len>0 && pr->host.len>0 && pr->stream.len>0 ) {
+                    ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, pr->uuid, 
+                            &pr->client_ip, &pr->server_ip, &pr->host, &pr->stream, 
+                            ngx_edge_type[proType], pr->cache_frame_num, pr->cache_time_duration);
+                }
             } else {
                 return;
             }
@@ -185,9 +206,11 @@ ngx_rtmp_edge_log(ngx_uint_t proType, ngx_uint_t logType, void *ss, ngx_uint_t c
                 if ( global_log == NULL && pr->s && pr->s->connection && pr->s->connection->log) {
                     global_log = pr->s->connection->log;
                 }
-                ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, pr->uuid, 
-                        &pr->client_ip, &pr->server_ip, &pr->host, &pr->stream, 
-                        ngx_edge_type[proType], pr->drop_video_size, pr->drop_audio_size, pr->drop_vframe_num, pr->drop_vduration);
+                if (pr->client_ip.len>0 && pr->server_ip.len>0 && pr->host.len>0 && pr->stream.len>0 ) {
+                    ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, pr->uuid, 
+                            &pr->client_ip, &pr->server_ip, &pr->host, &pr->stream, 
+                            ngx_edge_type[proType], pr->drop_video_size, pr->drop_audio_size, pr->drop_vframe_num, pr->drop_vduration);
+                }
             } else {
                 return; 
             }
@@ -199,7 +222,7 @@ ngx_rtmp_edge_log(ngx_uint_t proType, ngx_uint_t logType, void *ss, ngx_uint_t c
                 if (global_log == NULL && cs->session && cs->session->connection && cs->session->connection->log ){
                     global_log = cs->session->connection->log;
                 }
-                if (cs && cs->ctx) { 
+                if (cs && cs->ctx && cs->ctx->rtmp_pull_url.len>0 && cs->ctx->http_pull_url.len>0) { 
                     ngx_log_error(NGX_LOG_INFO, global_log, 0, szformat, current_ts, cs->status_code, 
                             &cs->ctx->rtmp_pull_url, &cs->ctx->http_pull_url, current_ts-cs->netcall_ts);
                 }

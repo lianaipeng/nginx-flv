@@ -1056,10 +1056,10 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
 
         return NULL;
     }
-
+  
     ngx_cycle->free_connections = c->data;
     ngx_cycle->free_connection_n--;
-
+    ngx_log_error(NGX_LOG_ALERT, log, 0,"get connections  %ui %ui",ngx_cycle->free_connection_n,ngx_cycle->connection_n);
     if (ngx_cycle->files && ngx_cycle->files[s] == NULL) {
         ngx_cycle->files[s] = c;
     }
@@ -1101,7 +1101,7 @@ ngx_free_connection(ngx_connection_t *c)
     c->data = ngx_cycle->free_connections;
     ngx_cycle->free_connections = c;
     ngx_cycle->free_connection_n++;
-
+    ngx_log_error(NGX_LOG_ALERT, c->log, 0,"free connections  %ui %ui",ngx_cycle->free_connection_n,ngx_cycle->connection_n);
     if (ngx_cycle->files && ngx_cycle->files[c->fd] == c) {
         ngx_cycle->files[c->fd] = NULL;
     }

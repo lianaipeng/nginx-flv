@@ -146,7 +146,22 @@ ngx_rtmp_init_socket(ngx_rtmp_session_t *s)
     // u_char uuid[32] = {'\0'};
     ngx_memzero(s->uuid, 32);
     ngx_sprintf(s->uuid, "%l_%d", current_ts, s->connection->fd);
+
+    s->server_ip.len = 0;
+    s->server_ip.data = NULL;
+
+    s->client_ip.len = 0; 
+    s->client_ip.data = NULL;
     
+    s->host.len = 0;
+    s->host.data = NULL;
+    
+    s->name.len = 0;
+    s->name.data = NULL;
+
+    s->pull_url.len = 0;
+    s->pull_url.data = NULL;
+
     // 获取client server ip
     struct sockaddr_in sa;
     int len = sizeof(sa);
@@ -180,7 +195,6 @@ ngx_rtmp_init_socket(ngx_rtmp_session_t *s)
     s->host.data = ngx_pcalloc(s->connection->pool, len+1);
     ngx_memzero(s->host.data, len+1);
     ngx_memcpy(s->host.data, host, len);
-
 }
 
 ngx_rtmp_session_t *

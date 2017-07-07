@@ -338,12 +338,16 @@ void * get_http_to_rtmp_module_app_conf(void *v,ngx_module_t module)
     ngx_rtmp_core_app_conf_t  **cacfp;
     ngx_uint_t   srv_num = 0;
     ngx_http_live_play_relay_loc_conf_t* hrlc;
+
+    if(v == NULL)
+        return NULL;
+
     ngx_http_request_t *r = (ngx_http_request_t*)v;
     ngx_http_live_play_request_ctx_t *  rctx = (ngx_http_live_play_request_ctx_t*)ngx_http_get_module_ctx(r,ngx_http_live_play_module);
 
     hrlc = (ngx_http_live_play_relay_loc_conf_t*)ngx_http_get_module_loc_conf(r,ngx_http_live_play_relay_module);
 
-    if(ngx_rtmp_ctx == NULL)
+    if(ngx_rtmp_ctx == NULL || hrlc == NULL || rctx == NULL)
     {
         ngx_printf_log("ngx_http_rtmp_relay","get_http_to_rtmp_module_app_conf","get rtmp modules config error");
         return NULL;
@@ -363,7 +367,7 @@ void * get_http_to_rtmp_module_app_conf(void *v,ngx_module_t module)
     rtmp_server_port = hrlc->rtmp_server_port;
 
 
-    if(cscfs == NULL && srv_num > 0)
+    if(cscfs == NULL || srv_num <= 0)
     {
         ngx_printf_log("ngx_http_rtmp_relay","get_http_to_rtmp_module_app_conf","srv_num is null");
         return NULL;

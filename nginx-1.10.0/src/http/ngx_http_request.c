@@ -541,6 +541,8 @@ ngx_http_create_request(ngx_connection_t *c)
 
     r->read_event_handler = ngx_http_block_reading;
     r->rewrite_close = 0;
+    r->close_flag = 0;
+
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
     ngx_set_connection_log(r->connection, clcf->error_log);
@@ -2268,6 +2270,9 @@ ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
                    "http finalize request: %i, \"%V?%V\" a:%d, c:%d",
                    rc, &r->uri, &r->args, r == c->data, r->main->count);
     //liw add 
+    if(r->close_flag)//表示已经关闭过了
+        return;
+    //liw add 
     if(rc == NGX_OK && r->rewrite_close)
         return;
         
@@ -3386,9 +3391,11 @@ ngx_http_close_request(ngx_http_request_t *r, ngx_int_t rc)
     r = r->main;
     c = r->connection;
 
-    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                   "http request count:%d blk:%d", r->count, r->blocked);
+    //ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
+    //               "http request count:%d blk:%d", r->count, r->blocked);
 
+    ngx_log_error(NGX_LOG_ALERT, c->log, 0, "http request count:%d blk:%d", r->count, r->blocked);
+    
     if (r->count == 0) {
         ngx_log_error(NGX_LOG_ALERT, c->log, 0, "http request count is zero");
     }

@@ -337,7 +337,7 @@ ngx_http_live_netcall_close(ngx_connection_t *cc)
     pool = cc->pool;
     ngx_close_connection(cc);
     ngx_destroy_pool(pool);
-     ngx_printf_log("ngx_http_live_play_relay_module","ngx_http_live_netcall_close","close");
+    ngx_printf_log("ngx_http_live_play_relay_module","ngx_http_live_netcall_close","close");
 }
 
 
@@ -862,8 +862,9 @@ static ngx_int_t ngx_http_live_notify_play_handle(ngx_http_live_play_relay_ctx_t
     hrctx->cs = NULL;
     hrctx->backing = 0;
 
+    printf("#########################\n");
     //free
-    /*char *message = (char*)malloc(1024 * 64);
+    char *message = (char*)malloc(1024 * 64);
     int len = 0;
     char * ptr = message;
     ngx_chain_t* cn = in;
@@ -878,7 +879,7 @@ static ngx_int_t ngx_http_live_notify_play_handle(ngx_http_live_play_relay_ctx_t
     }
     ptr[len+1] = '\0';
     printf("message len %d  body: %s \n",len,message);
-    */
+
 
     rc = ngx_http_live_notify_parse_http_retcode(in);
     if (rc != NGX_OK) {

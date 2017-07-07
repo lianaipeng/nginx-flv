@@ -579,6 +579,7 @@ struct ngx_http_request_s {
     unsigned                          http_major:16;
     //liw add param
     ngx_int_t                        rewrite_close;
+    ngx_int_t                        close_flag;
     // 日志相关
     ngx_int_t                        status_code;
 };
